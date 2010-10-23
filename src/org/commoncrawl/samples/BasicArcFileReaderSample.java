@@ -15,7 +15,6 @@ import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.RecordReader;
 import org.apache.hadoop.mapred.Reporter;
 import org.apache.hadoop.mapred.Counters.Counter;
-import org.commoncrawl.ec2jobs.ARCFileMetadataExtractor;
 import org.commoncrawl.hadoop.io.ARCInputFormat;
 import org.commoncrawl.hadoop.io.ARCResource;
 import org.commoncrawl.hadoop.io.ARCSplit;
@@ -25,12 +24,16 @@ import org.commoncrawl.protocol.shared.ArcFileMetadata;
 import org.commoncrawl.util.shared.CCStringUtils;
 import org.commoncrawl.util.shared.FileUtils;
 
+import com.google.common.collect.ImmutableMap;
 import com.hadoop.compression.lzo.LzoCodec;
 
 public class BasicArcFileReaderSample {
 
+	static ImmutableMap<String, String> map = new ImmutableMap.Builder<String,String>().put("ONE","TWO").put("ONE", "THREE").build(); 
+		
+	
   /** logging **/
-  private static final Log LOG = LogFactory.getLog(ARCFileMetadataExtractor.class);
+  private static final Log LOG = LogFactory.getLog(BasicArcFileReaderSample.class);
 
 	
   public static void main(String[] args) {

@@ -352,7 +352,13 @@ public final class TextBytes extends BinaryComparable implements WritableCompara
 	  }
 
 	  public int hashCode() {
-	    return WritableComparator.hashBytes(getBytes(),getOffset(),getLength());
+	    int hash = 1;
+	    int offset = getOffset();
+	    int length = getLength();
+	    byte bytesArray[] = bytes.get();
+	    for (int i = offset; i < offset + length; i++)
+	      hash = (31 * hash) + (int)bytesArray[i];
+	    return hash;
 	  }
 
 	  /** A WritableComparator optimized for Text keys. */
