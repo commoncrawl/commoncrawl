@@ -8,21 +8,22 @@ import org.apache.hadoop.fs.FSInputStream;
 import org.apache.hadoop.fs.PositionedReadable;
 import org.apache.hadoop.fs.Seekable;
 
-
-/** ByteBuffer based input stream that also implements Seekable and Positionable,
- *  thus allowing it to emulate FSDataInputStream
+/**
+ * ByteBuffer based input stream that also implements Seekable and Positionable,
+ * thus allowing it to emulate FSDataInputStream
  * 
  * @author rana
- *
+ * 
  */
-public class FSByteBufferInputStream extends BufferedInputStream implements Seekable, PositionedReadable {
-	
-	ByteBuffer _source;
-	
+public class FSByteBufferInputStream extends BufferedInputStream implements
+    Seekable, PositionedReadable {
+
+  ByteBuffer _source;
+
   public FSByteBufferInputStream(ByteBuffer in) {
-  	super(new ByteBufferInputStream(in),in.limit());
-  	_source = in;
-  	
+    super(new ByteBufferInputStream(in), in.limit());
+    _source = in;
+
   }
 
   public long getPos() throws IOException {
@@ -33,19 +34,19 @@ public class FSByteBufferInputStream extends BufferedInputStream implements Seek
     if (n <= 0) {
       return 0;
     }
-    _source.position(_source.position() + (int)n);
+    _source.position(_source.position() + (int) n);
     return n;
   }
 
   public void seek(long pos) throws IOException {
-    if( pos<0 ) {
+    if (pos < 0) {
       return;
     }
     // optimize: check if the pos is in the buffer
-    long end =_source.position();
+    long end = _source.position();
     long start = end - count;
-    if( pos>=start && pos<end) {
-      this.pos = (int)(pos-start);
+    if (pos >= start && pos < end) {
+      this.pos = (int) (pos - start);
       return;
     }
 
@@ -53,35 +54,37 @@ public class FSByteBufferInputStream extends BufferedInputStream implements Seek
     this.pos = 0;
     this.count = 0;
 
-    _source.position((int)pos);
+    _source.position((int) pos);
   }
 
   public boolean seekToNewSource(long targetPos) throws IOException {
     pos = 0;
     count = 0;
-    _source.position((int)targetPos);
+    _source.position((int) targetPos);
     return true;
   }
 
-  public int read(long position, byte[] buffer, int offset, int length) throws IOException {
-  	_source.mark();
-  	_source.position((int)position);
-  	int bytesToRead = Math.min(length,_source.remaining());
-    _source.get(buffer, offset,bytesToRead );
+  public int read(long position, byte[] buffer, int offset, int length)
+      throws IOException {
+    _source.mark();
+    _source.position((int) position);
+    int bytesToRead = Math.min(length, _source.remaining());
+    _source.get(buffer, offset, bytesToRead);
     _source.reset();
     return bytesToRead;
   }
 
-  public void readFully(long position, byte[] buffer, int offset, int length) throws IOException {
-  	_source.mark();
-  	_source.position((int)position);
-    _source.get(buffer, offset,length );
+  public void readFully(long position, byte[] buffer, int offset, int length)
+      throws IOException {
+    _source.mark();
+    _source.position((int) position);
+    _source.get(buffer, offset, length);
     _source.reset();
   }
 
   public void readFully(long position, byte[] buffer) throws IOException {
-  	_source.mark();
-  	_source.position((int)position);
+    _source.mark();
+    _source.position((int) position);
     _source.get(buffer);
     _source.reset();
   }

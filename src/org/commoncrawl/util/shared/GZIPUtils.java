@@ -17,7 +17,6 @@ package org.commoncrawl.util.shared;
  * limitations under the License.
  */
 
-
 import java.io.ByteArrayOutputStream;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -29,65 +28,64 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
 /**
- *  A collection of utility methods for working on GZIPed data.
+ * A collection of utility methods for working on GZIPed data.
  */
 public class GZIPUtils {
-  
-  private static final Log LOG = LogFactory.getLog(GZIPUtils.class);
-  private static final int EXPECTED_COMPRESSION_RATIO= 5;
-  private static final int BUF_SIZE= 4096;
 
-  
-  public static class UnzipResult { 
+  private static final Log LOG                        = LogFactory
+                                                          .getLog(GZIPUtils.class);
+  private static final int EXPECTED_COMPRESSION_RATIO = 5;
+  private static final int BUF_SIZE                   = 4096;
 
-    public UnzipResult(byte[] data,boolean truncated) { 
+  public static class UnzipResult {
+
+    public UnzipResult(byte[] data, boolean truncated) {
       this.data = data;
       this.wasTruncated = truncated;
     }
-    
-    public    byte[]    data;
-    public    boolean   wasTruncated = false;
+
+    public byte[]  data;
+    public boolean wasTruncated = false;
   }
-  
+
   /**
-   * Returns an gunzipped copy of the input array.  If the gzipped
-   * input has been truncated or corrupted, a best-effort attempt is
-   * made to unzip as much as possible.  If no data can be extracted
-   * <code>null</code> is returned.
+   * Returns an gunzipped copy of the input array. If the gzipped input has been
+   * truncated or corrupted, a best-effort attempt is made to unzip as much as
+   * possible. If no data can be extracted <code>null</code> is returned.
    */
   public static final UnzipResult unzipBestEffort(byte[] in) {
-     return unzipBestEffort(in,0,in.length, Integer.MAX_VALUE);
+    return unzipBestEffort(in, 0, in.length, Integer.MAX_VALUE);
   }
 
-  public static final UnzipResult unzipBestEffort(byte[] in,int sizeLimit) {
-  	return unzipBestEffort(in, 0, in.length, sizeLimit);
+  public static final UnzipResult unzipBestEffort(byte[] in, int sizeLimit) {
+    return unzipBestEffort(in, 0, in.length, sizeLimit);
   }
-  
+
   /**
    * Returns an gunzipped copy of the input array, truncated to
-   * <code>sizeLimit</code> bytes, if necessary.  If the gzipped input
-   * has been truncated or corrupted, a best-effort attempt is made to
-   * unzip as much as possible.  If no data can be extracted
-   * <code>null</code> is returned.
+   * <code>sizeLimit</code> bytes, if necessary. If the gzipped input has been
+   * truncated or corrupted, a best-effort attempt is made to unzip as much as
+   * possible. If no data can be extracted <code>null</code> is returned.
    */
-  public static final UnzipResult unzipBestEffort(byte[] in,int offset,int sizeIn, int sizeLimit) {
-  	
+  public static final UnzipResult unzipBestEffort(byte[] in, int offset,
+      int sizeIn, int sizeLimit) {
+
     try {
-      // decompress using GZIPInputStream 
-      ByteArrayOutputStream outStream = 
-        new ByteArrayOutputStream(EXPECTED_COMPRESSION_RATIO * in.length);
+      // decompress using GZIPInputStream
+      ByteArrayOutputStream outStream = new ByteArrayOutputStream(
+          EXPECTED_COMPRESSION_RATIO * in.length);
 
       boolean truncated = false;
-      
-      GZIPInputStream inStream = 
-        new GZIPInputStream ( new ByteArrayInputStream(in,offset,sizeIn) );
+
+      GZIPInputStream inStream = new GZIPInputStream(new ByteArrayInputStream(
+          in, offset, sizeIn));
 
       byte[] buf = new byte[BUF_SIZE];
       int written = 0;
       while (true) {
         try {
           int size = inStream.read(buf);
-          if (size <= 0) 
+          if (size <= 0)
             break;
           if ((written + size) > sizeLimit) {
             outStream.write(buf, 0, sizeLimit - written);
@@ -95,7 +93,7 @@ public class GZIPUtils {
             break;
           }
           outStream.write(buf, 0, size);
-          written+= size;
+          written += size;
         } catch (Exception e) {
           break;
         }
@@ -105,34 +103,33 @@ public class GZIPUtils {
       } catch (IOException e) {
       }
 
-      return new UnzipResult(outStream.toByteArray(),truncated);
+      return new UnzipResult(outStream.toByteArray(), truncated);
 
     } catch (IOException e) {
       return null;
-    }
-    catch (OutOfMemoryError e) { 
-    	LOG.fatal(CCStringUtils.stringifyException(e));
-    	return null;
+    } catch (OutOfMemoryError e) {
+      LOG.fatal(CCStringUtils.stringifyException(e));
+      return null;
     }
   }
 
-
   /**
-   * Returns an gunzipped copy of the input array.  
-   * @throws IOException if the input cannot be properly decompressed
+   * Returns an gunzipped copy of the input array.
+   * 
+   * @throws IOException
+   *           if the input cannot be properly decompressed
    */
   public static final byte[] unzip(byte[] in) throws IOException {
-    // decompress using GZIPInputStream 
-    ByteArrayOutputStream outStream = 
-      new ByteArrayOutputStream(EXPECTED_COMPRESSION_RATIO * in.length);
+    // decompress using GZIPInputStream
+    ByteArrayOutputStream outStream = new ByteArrayOutputStream(
+        EXPECTED_COMPRESSION_RATIO * in.length);
 
-    GZIPInputStream inStream = 
-      new GZIPInputStream ( new ByteArrayInputStream(in) );
+    GZIPInputStream inStream = new GZIPInputStream(new ByteArrayInputStream(in));
 
     byte[] buf = new byte[BUF_SIZE];
     while (true) {
       int size = inStream.read(buf);
-      if (size <= 0) 
+      if (size <= 0)
         break;
       outStream.write(buf, 0, size);
     }
@@ -146,11 +143,11 @@ public class GZIPUtils {
    */
   public static final byte[] zip(byte[] in) {
     try {
-      // compress using GZIPOutputStream 
-      ByteArrayOutputStream byteOut= 
-        new ByteArrayOutputStream(in.length / EXPECTED_COMPRESSION_RATIO);
+      // compress using GZIPOutputStream
+      ByteArrayOutputStream byteOut = new ByteArrayOutputStream(in.length
+          / EXPECTED_COMPRESSION_RATIO);
 
-      GZIPOutputStream outStream= new GZIPOutputStream(byteOut);
+      GZIPOutputStream outStream = new GZIPOutputStream(byteOut);
 
       try {
         outStream.write(in);
@@ -171,5 +168,5 @@ public class GZIPUtils {
       return null;
     }
   }
-    
+
 }

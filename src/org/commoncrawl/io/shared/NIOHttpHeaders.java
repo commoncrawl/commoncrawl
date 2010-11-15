@@ -31,34 +31,31 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.commoncrawl.util.shared.CCStringUtils;
 
-
 /*
  * Derived FROM HttpHeaders in OpenJDK
  * 
  */
 
-
 /*-
  *  news stream opener
  */
 
-public final class NIOHttpHeaders{
+public final class NIOHttpHeaders {
 
   /** logging **/
   private static final Log LOG = LogFactory.getLog(NIOHttpHeaders.class);
-  
 
-  /** An RFC 844 or MIME message header.  Includes methods
-      for parsing headers from incoming streams, fetching
-      values, setting values, and printing headers.
-      Key values of null are legal: they indicate lines in
-      the header that don't have a valid key, but do have
-      a value (this isn't legal according to the standard,
-      but lines like this are everywhere). */
+  /**
+   * An RFC 844 or MIME message header. Includes methods for parsing headers
+   * from incoming streams, fetching values, setting values, and printing
+   * headers. Key values of null are legal: they indicate lines in the header
+   * that don't have a valid key, but do have a value (this isn't legal
+   * according to the standard, but lines like this are everywhere).
+   */
 
-  private String keys[];
-  private String values[];
-  private int nkeys;
+  private String           keys[];
+  private String           values[];
+  private int              nkeys;
 
   public NIOHttpHeaders() {
     grow();
@@ -79,9 +76,11 @@ public final class NIOHttpHeaders{
   }
 
   /**
-   * Find the value that corresponds to this key.
-   * It finds only the first occurrence of the key.
-   * @param k the key to find.
+   * Find the value that corresponds to this key. It finds only the first
+   * occurrence of the key.
+   * 
+   * @param k
+   *          the key to find.
    * @return null if not found.
    */
   public synchronized String findValue(String k) {
@@ -100,32 +99,34 @@ public final class NIOHttpHeaders{
   // return the location of the key
   public synchronized int getKey(String k) {
     for (int i = nkeys; --i >= 0;)
-      if ((keys[i] == k) ||
-          (k != null && k.equalsIgnoreCase(keys[i])))
+      if ((keys[i] == k) || (k != null && k.equalsIgnoreCase(keys[i])))
         return i;
     return -1;
   }
 
   public synchronized String getKey(int n) {
-    if (n < 0 || n >= nkeys) return null;
+    if (n < 0 || n >= nkeys)
+      return null;
     return keys[n];
   }
 
   public synchronized String getValue(int n) {
-    if (n < 0 || n >= nkeys) return null;
+    if (n < 0 || n >= nkeys)
+      return null;
     return values[n];
   }
 
-  /** Deprecated: Use multiValueIterator() instead.
-   *
-   *  Find the next value that corresponds to this key.
-   *  It finds the first value that follows v. To iterate
-   *  over all the values of a key use:
-   *  <pre>
+  /**
+   * Deprecated: Use multiValueIterator() instead.
+   * 
+   * Find the next value that corresponds to this key. It finds the first value
+   * that follows v. To iterate over all the values of a key use:
+   * 
+   * <pre>
    *    for(String v=h.findValue(k); v!=null; v=h.findNextValue(k, v)) {
    *        ...
    *    }
-   *  </pre>
+   * </pre>
    */
   public synchronized String findNextValue(String k, String v) {
     boolean foundV = false;
@@ -147,79 +148,81 @@ public final class NIOHttpHeaders{
   }
 
   public class HeaderIterator implements Iterator<String> {
-    int index = 0;
-    int next = -1;
-    String key;
+    int     index    = 0;
+    int     next     = -1;
+    String  key;
     boolean haveNext = false;
-    Object lock;
+    Object  lock;
 
-    public HeaderIterator (String k, Object lock) {
+    public HeaderIterator(String k, Object lock) {
       key = k;
       this.lock = lock;
     }
-    public boolean hasNext () {
+
+    public boolean hasNext() {
       synchronized (lock) {
         if (haveNext) {
           return true;
         }
         while (index < nkeys) {
-          if (key.equalsIgnoreCase (keys[index])) {
+          if (key.equalsIgnoreCase(keys[index])) {
             haveNext = true;
             next = index++;
             return true;
           }
-          index ++;
+          index++;
         }
         return false;
       }
     }
+
     public String next() {
       synchronized (lock) {
         if (haveNext) {
           haveNext = false;
-          return values [next];
+          return values[next];
         }
         if (hasNext()) {
           return next();
         } else {
-          throw new NoSuchElementException ("No more elements");
+          throw new NoSuchElementException("No more elements");
         }
       }
     }
-    public void remove () {
-      throw new UnsupportedOperationException ("remove not allowed");
+
+    public void remove() {
+      throw new UnsupportedOperationException("remove not allowed");
     }
   }
 
   /**
-   * return an Iterator that returns all values of a particular
-   * key in sequence
+   * return an Iterator that returns all values of a particular key in sequence
    */
-  public Iterator<String> multiValueIterator (String k) {
-    return new HeaderIterator (k, this);
+  public Iterator<String> multiValueIterator(String k) {
+    return new HeaderIterator(k, this);
   }
 
   public synchronized Map getHeaders() {
     return getHeaders(null);
   }
 
-  public synchronized Map<String,List<String> > getHeaders(String[] excludeList) {
+  public synchronized Map<String, List<String>> getHeaders(String[] excludeList) {
     boolean skipIt = false;
-    Map<String,List<String> > m = new HashMap<String,List<String> >();
+    Map<String, List<String>> m = new HashMap<String, List<String>>();
     for (int i = nkeys; --i >= 0;) {
       if (excludeList != null) {
         // check if the key is in the excludeList.
         // if so, don't include it in the Map.
         for (int j = 0; j < excludeList.length; j++) {
-          if ((excludeList[j] != null) && 
-              (excludeList[j].equalsIgnoreCase(keys[i]))) {
+          if ((excludeList[j] != null)
+              && (excludeList[j].equalsIgnoreCase(keys[i]))) {
             skipIt = true;
             break;
           }
         }
       }
       if (!skipIt) {
-        List<String> l = (List<String>)m.get(keys[i]);
+        List<String> l = (List<String>) m.get(keys[i]);
         if (l == null) {
           l = new ArrayList<String>();
           m.put(keys[i], l);
@@ -238,29 +241,31 @@ public final class NIOHttpHeaders{
       m.put(key, Collections.unmodifiableList(l));
     }
 
-    return (Map<String,List<String> >)Collections.unmodifiableMap(m);
+    return (Map<String, List<String>>) Collections.unmodifiableMap(m);
   }
 
-  /** Prints the key-value pairs represented by this
-    header.  Also prints the RFC required blank line
-    at the end. Omits pairs with a null key. */
+  /**
+   * Prints the key-value pairs represented by this header. Also prints the RFC
+   * required blank line at the end. Omits pairs with a null key.
+   */
   public synchronized void print(PrintWriter p) {
-    
-    for (int i = 0; i < nkeys; i++) 
+
+    for (int i = 0; i < nkeys; i++)
       if (keys[i] != null) {
-        p.print(keys[i] + 
-            (values[i] != null ? ": "+values[i]: "") + "\r\n");
-        // System.out.print(keys[i] +(values[i] != null ? ": "+values[i]: "") + "\r\n");
+        p.print(keys[i] + (values[i] != null ? ": " + values[i] : "") + "\r\n");
+        // System.out.print(keys[i] +(values[i] != null ? ": "+values[i]: "") +
+        // "\r\n");
 
       }
     p.print("\r\n");
     // System.out.print("\r\n");
-    
+
     p.flush();
   }
 
-  /** Adds a key value pair to the end of the
-    header.  Duplicates are allowed */
+  /**
+   * Adds a key value pair to the end of the header. Duplicates are allowed
+   */
   public synchronized void add(String k, String v) {
     grow();
     keys[nkeys] = k;
@@ -268,22 +273,24 @@ public final class NIOHttpHeaders{
     nkeys++;
   }
 
-  /** Prepends a key value pair to the beginning of the
-    header.  Duplicates are allowed */
+  /**
+   * Prepends a key value pair to the beginning of the header. Duplicates are
+   * allowed
+   */
   public synchronized void prepend(String k, String v) {
     grow();
     for (int i = nkeys; i > 0; i--) {
-      keys[i] = keys[i-1];
-      values[i] = values[i-1];
+      keys[i] = keys[i - 1];
+      values[i] = values[i - 1];
     }
     keys[0] = k;
     values[0] = v;
     nkeys++;
   }
 
-  /** Overwrite the previous key/val pair at location 'i'
-   * with the new k/v.  If the index didn't exist before
-   * the key/val is simply tacked onto the end.
+  /**
+   * Overwrite the previous key/val pair at location 'i' with the new k/v. If
+   * the index didn't exist before the key/val is simply tacked onto the end.
    */
 
   public synchronized void set(int i, String k, String v) {
@@ -297,7 +304,6 @@ public final class NIOHttpHeaders{
       values[i] = v;
     }
   }
-
 
   /** grow the key/value arrays as needed */
 
@@ -315,19 +321,20 @@ public final class NIOHttpHeaders{
   }
 
   /**
-   * Remove the key from the header. If there are multiple values under
-   * the same key, they are all removed.
-   * Nothing is done if the key doesn't exist.
-   * After a remove, the other pairs' order are not changed.
-   * @param k the key to remove
+   * Remove the key from the header. If there are multiple values under the same
+   * key, they are all removed. Nothing is done if the key doesn't exist. After
+   * a remove, the other pairs' order are not changed.
+   * 
+   * @param k
+   *          the key to remove
    */
   public synchronized void remove(String k) {
-    if(k == null) {
+    if (k == null) {
       for (int i = 0; i < nkeys; i++) {
         while (keys[i] == null && i < nkeys) {
-          for(int j=i; j<nkeys-1; j++) {
-            keys[j] = keys[j+1];
-            values[j] = values[j+1];
+          for (int j = i; j < nkeys - 1; j++) {
+            keys[j] = keys[j + 1];
+            values[j] = values[j + 1];
           }
           nkeys--;
         }
@@ -335,9 +342,9 @@ public final class NIOHttpHeaders{
     } else {
       for (int i = 0; i < nkeys; i++) {
         while (k.equalsIgnoreCase(keys[i]) && i < nkeys) {
-          for(int j=i; j<nkeys-1; j++) {
-            keys[j] = keys[j+1];
-            values[j] = values[j+1];
+          for (int j = i; j < nkeys - 1; j++) {
+            keys[j] = keys[j + 1];
+            values[j] = values[j + 1];
           }
           nkeys--;
         }
@@ -345,10 +352,11 @@ public final class NIOHttpHeaders{
     }
   }
 
-  /** Sets the value of a key.  If the key already
-    exists in the header, it's value will be
-    changed.  Otherwise a new key/value pair will
-    be added to the end of the header. */
+  /**
+   * Sets the value of a key. If the key already exists in the header, it's
+   * value will be changed. Otherwise a new key/value pair will be added to the
+   * end of the header.
+   */
   public synchronized void set(String k, String v) {
     for (int i = nkeys; --i >= 0;)
       if (k.equalsIgnoreCase(keys[i])) {
@@ -358,8 +366,8 @@ public final class NIOHttpHeaders{
     add(k, v);
   }
 
-  /** Set's the value of a key only if there is no
-   *  key with that value already.
+  /**
+   * Set's the value of a key only if there is no key with that value already.
    */
 
   public synchronized void setIfNotSet(String k, String v) {
@@ -368,8 +376,10 @@ public final class NIOHttpHeaders{
     }
   }
 
-  /** Convert a message-id string to canonical form (strips off
-    leading and trailing <>s) */
+  /**
+   * Convert a message-id string to canonical form (strips off leading and
+   * trailing <>s)
+   */
   public static String canonicalID(String id) {
     if (id == null)
       return "";
@@ -377,13 +387,11 @@ public final class NIOHttpHeaders{
     int len = id.length();
     boolean substr = false;
     int c;
-    while (st < len && ((c = id.charAt(st)) == '<' ||
-        c <= ' ')) {
+    while (st < len && ((c = id.charAt(st)) == '<' || c <= ' ')) {
       st++;
       substr = true;
     }
-    while (st < len && ((c = id.charAt(len - 1)) == '>' ||
-        c <= ' ')) {
+    while (st < len && ((c = id.charAt(len - 1)) == '>' || c <= ' ')) {
       len--;
       substr = true;
     }
@@ -410,32 +418,32 @@ public final class NIOHttpHeaders{
       int c;
       boolean inKey = firstc > ' ';
       s[len++] = (char) firstc;
-      parseloop:{
+      parseloop: {
         while ((c = is.read()) > 0) {
           switch (c) {
-          case ':':
-            if (inKey && len > 0)
-              keyend = len;
-            inKey = false;
-            break;
-          case '\t':
-            c = ' ';
-          case ' ':
-            inKey = false;
-            break;
-          case '\r':
-          case '\n':
-            firstc = is.read();
-            if (c == '\r' && firstc == '\n') {
+            case ':':
+              if (inKey && len > 0)
+                keyend = len;
+              inKey = false;
+              break;
+            case '\t':
+              c = ' ';
+            case ' ':
+              inKey = false;
+              break;
+            case '\r':
+            case '\n':
               firstc = is.read();
-              if (firstc == '\r')
+              if (c == '\r' && firstc == '\n') {
                 firstc = is.read();
-            }
-            if (firstc == '\n' || firstc == '\r' || firstc > ' ')
-              break parseloop;
-            /* continuation */
-            c = ' ';
-            break;
+                if (firstc == '\r')
+                  firstc = is.read();
+              }
+              if (firstc == '\n' || firstc == '\r' || firstc > ' ')
+                break parseloop;
+              /* continuation */
+              c = ' ';
+              break;
           }
           if (len >= s.length) {
             char ns[] = new char[s.length * 2];
@@ -464,16 +472,16 @@ public final class NIOHttpHeaders{
         v = new String();
       else
         v = String.copyValueOf(s, keyend, len - keyend);
-      
+
       add(k, v.trim());
     }
   }
 
   public synchronized String toString() {
     StringWriter writer = new StringWriter();
-    
+
     for (int i = 0; i < keys.length && i < nkeys; i++) {
-      if (keys[i] != null && keys[i].length() != 0) { 
+      if (keys[i] != null && keys[i].length() != 0) {
         writer.write(keys[i]);
         writer.write(":");
       }
@@ -482,76 +490,77 @@ public final class NIOHttpHeaders{
     }
     return writer.toString();
   }
-  
+
   public static NIOHttpHeaders parseHttpHeadersAlternate(String headers) {
-    
+
     NIOHttpHeaders headersOut = new NIOHttpHeaders();
-    
-    if (headers != null && headers.length() != 0) {    
-      StringTokenizer tokenizer = new StringTokenizer(headers,"\r\n");
-      
-      while (tokenizer.hasMoreElements()) { 
+
+    if (headers != null && headers.length() != 0) {
+      StringTokenizer tokenizer = new StringTokenizer(headers, "\r\n");
+
+      while (tokenizer.hasMoreElements()) {
         String token = tokenizer.nextToken();
-        
-        if (token != null  && token.length() != 0) { 
+
+        if (token != null && token.length() != 0) {
           int colonPos = token.indexOf(':');
-          
-          if (colonPos != -1 && colonPos != token.length() - 1) { 
-  
-            String key = token.substring(0,colonPos);
+
+          if (colonPos != -1 && colonPos != token.length() - 1) {
+
+            String key = token.substring(0, colonPos);
             String value = token.substring(colonPos + 1);
-            
-            if (key.length() !=0 && value.length() != 0) { 
+
+            if (key.length() != 0 && value.length() != 0) {
               headersOut.add(key, value);
             }
+          } else {
+            headersOut.add(null, token);
           }
-          else { 
-            headersOut.add(null,token); 
-           }
-          
+
         }
       }
     }
     return headersOut;
   }
-  
-  public static NIOHttpHeaders parseHttpHeaders(String headers)throws IOException { 
+
+  public static NIOHttpHeaders parseHttpHeaders(String headers)
+      throws IOException {
 
     NIOHttpHeaders headersOut = new NIOHttpHeaders();
-    
+
     if (headers != null && headers.length() != 0) {
-      
+
       headersOut.parseHeader(new StringReader(headers));
-      
+
       /*
       */
     }
     return headersOut;
   }
-  
+
   /** extract http result code from headers **/
-  public int  getHttpResponseCode() { 
-    
+  public int getHttpResponseCode() {
+
     int responseCode = -1;
 
-    try { 
+    try {
       String responseLine = getValue(0);
-      
-      if (responseLine != null) { 
-  
+
+      if (responseLine != null) {
+
         int index;
         index = responseLine.indexOf(' ');
-        while(index < responseLine.length() && responseLine.charAt(index) == ' ')
-            index++;
-        if (index + 2 < responseLine.length()) { 
-          responseCode = Integer.parseInt(responseLine.substring(index, index + 3));
+        while (index < responseLine.length()
+            && responseLine.charAt(index) == ' ')
+          index++;
+        if (index + 2 < responseLine.length()) {
+          responseCode = Integer.parseInt(responseLine.substring(index,
+              index + 3));
         }
       }
-    }
-    catch (Exception e) {
+    } catch (Exception e) {
       LOG.error(CCStringUtils.stringifyException(e));
     }
     return responseCode;
   }
-  
+
 }

@@ -15,41 +15,48 @@ import org.apache.commons.logging.LogFactory;
  * Some basic JVM stats utilities
  * 
  * @author rana
- *
+ * 
  */
 public class JVMStats {
 
   /** logging **/
-  private static final Log LOG = LogFactory.getLog(JVMStats.class);  
-  
-  private static final long MBytes = 1024*1024;
-  
-  private static long lastGCTime = 0;
-  
+  private static final Log  LOG        = LogFactory.getLog(JVMStats.class);
+
+  private static final long MBytes     = 1024 * 1024;
+
+  private static long       lastGCTime = 0;
+
   public static void dumpMemoryStats() {
 
-    MemoryMXBean memoryMXBean =ManagementFactory.getMemoryMXBean();
+    MemoryMXBean memoryMXBean = ManagementFactory.getMemoryMXBean();
     MemoryUsage memHeap = memoryMXBean.getHeapMemoryUsage();
-    
-    List<GarbageCollectorMXBean> gcBeans = ManagementFactory.getGarbageCollectorMXBeans();
+
+    List<GarbageCollectorMXBean> gcBeans = ManagementFactory
+        .getGarbageCollectorMXBeans();
 
     long gcTime = 0;
     for (GarbageCollectorMXBean gcBean : gcBeans) {
-        gcTime += gcBean.getCollectionTime();
+      gcTime += gcBean.getCollectionTime();
     }
-    
-    float utilizationRatio = ((float)memHeap.getUsed()) / ((float)memHeap.getMax());
-    
-    LOG.info("Heap Size:" + memHeap.getUsed() / MBytes + " (MB) CommitSize:" + memHeap.getCommitted()/MBytes + " (MB) Max:" + memHeap.getMax() +  " Ratio:" +utilizationRatio  +" GCTime:" +(gcTime - lastGCTime) + "PendingFinalCnt:" + memoryMXBean.getObjectPendingFinalizationCount());
-    
+
+    float utilizationRatio = ((float) memHeap.getUsed())
+        / ((float) memHeap.getMax());
+
+    LOG
+        .info("Heap Size:" + memHeap.getUsed() / MBytes + " (MB) CommitSize:"
+            + memHeap.getCommitted() / MBytes + " (MB) Max:" + memHeap.getMax()
+            + " Ratio:" + utilizationRatio + " GCTime:" + (gcTime - lastGCTime)
+            + "PendingFinalCnt:"
+            + memoryMXBean.getObjectPendingFinalizationCount());
+
     lastGCTime = gcTime;
   }
 
-  public static float getHeapUtilizationRatio() { 
-    MemoryMXBean memoryMXBean =ManagementFactory.getMemoryMXBean();
+  public static float getHeapUtilizationRatio() {
+    MemoryMXBean memoryMXBean = ManagementFactory.getMemoryMXBean();
     MemoryUsage memHeap = memoryMXBean.getHeapMemoryUsage();
-    
-    return ((float)memHeap.getUsed()) / ((float)memHeap.getMax());
+
+    return ((float) memHeap.getUsed()) / ((float) memHeap.getMax());
   }
-  
+
 }

@@ -24,53 +24,53 @@ import org.apache.hadoop.io.Writable;
 
 /**
  * The name and size in bytes of a gzipped ARC file.
- *
+ * 
  * @author Albert Chern
  */
 public class ARCResource implements Writable {
-    
-    private String name;
-    private long size;
-    
-    public ARCResource(String name, long size) {
-        this.name = name;
-        this.size = size;
-    }
-    
-    /**
-     * Returns the name of this resource.
-     */
-    public String getName() {
-        return name;
-    }
-    
-    /**
-     * Returns the size in bytes of this resource.
-     */
-    public long getSize() {
-        return size;
-    }
-    
-    /**
-     * @inheritDoc
-     */
-    public String toString() {
-        return name + " " + size;
-    }
-    
-    /**
-     * @inheritDoc
-     */
-    public void write(DataOutput out) throws IOException {
-        Text.writeString(out, name);
-        out.writeLong(size);
-    }
-    
-    /**
-     * @inheritDoc
-     */
-    public void readFields(DataInput in) throws IOException {
-        name = Text.readString(in);
-        size = in.readLong();
-    }
+
+  private String name;
+  private long   size;
+
+  public ARCResource(String name, long size) {
+    this.name = name;
+    this.size = size;
+  }
+
+  /**
+   * Returns the name of this resource.
+   */
+  public String getName() {
+    return name;
+  }
+
+  /**
+   * Returns the size in bytes of this resource.
+   */
+  public long getSize() {
+    return size;
+  }
+
+  /**
+   * @inheritDoc
+   */
+  public String toString() {
+    return name + " " + size;
+  }
+
+  /**
+   * @inheritDoc
+   */
+  public void write(DataOutput out) throws IOException {
+    Text.writeString(out, name);
+    out.writeLong(size);
+  }
+
+  /**
+   * @inheritDoc
+   */
+  public void readFields(DataInput in) throws IOException {
+    name = Text.readString(in);
+    size = in.readLong();
+  }
 }

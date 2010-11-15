@@ -19,18 +19,18 @@ package org.commoncrawl.io.shared;
 import java.nio.ByteBuffer;
 
 /** Asynchronous data download support **/
-public interface NIODataSink { 
-  
-	/**
-	 * called whenever some data becomes available
-	 * 
-	 * @param availableReadBuffer
-	 */
-  public void available(ByteBuffer availableReadBuffer);
-  
+public interface NIODataSink {
+
   /**
-   * called whenever a download has completed 
+   * called whenever some data becomes available
+   * 
+   * @param availableReadBuffer
+   */
+  public void available(ByteBuffer availableReadBuffer);
+
+  /**
+   * called whenever a download has completed
    */
   public void finished();
-  
+
 }

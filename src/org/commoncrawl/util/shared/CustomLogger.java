@@ -14,17 +14,17 @@ import org.apache.log4j.spi.LoggerRepository;
  * Hacked implementation of CustomLogger using log4j framework
  * 
  * @author rana
- *
+ * 
  */
 public class CustomLogger extends Category {
 
   public CustomLogger(String name) {
-    
+
     super(name);
 
     repository = new LoggerRepository() {
 
-      public void addHierarchyEventListener(HierarchyEventListener listener) {        
+      public void addHierarchyEventListener(HierarchyEventListener listener) {
       }
 
       public void emitNoAppenderWarning(Category cat) {
@@ -75,10 +75,10 @@ public class CustomLogger extends Category {
       }
 
       public void shutdown() {
-      } 
+      }
     };
-    
+
     this.setLevel(Level.ALL);
   }
-  
+
 }

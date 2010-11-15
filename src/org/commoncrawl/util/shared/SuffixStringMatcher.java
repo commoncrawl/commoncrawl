@@ -4,8 +4,8 @@ import java.util.Collection;
 import java.util.Iterator;
 
 /**
- * A class for efficiently matching <code>String</code>s against a set
- * of suffixes.  Zero-length <code>Strings</code> are ignored.
+ * A class for efficiently matching <code>String</code>s against a set of
+ * suffixes. Zero-length <code>Strings</code> are ignored.
  */
 public class SuffixStringMatcher extends TrieStringMatcher {
 
@@ -15,7 +15,7 @@ public class SuffixStringMatcher extends TrieStringMatcher {
    */
   public SuffixStringMatcher(String[] suffixes) {
     super();
-    for (int i= 0; i < suffixes.length; i++)
+    for (int i = 0; i < suffixes.length; i++)
       addPatternBackward(suffixes[i]);
   }
 
@@ -26,20 +26,20 @@ public class SuffixStringMatcher extends TrieStringMatcher {
    */
   public SuffixStringMatcher(Collection suffixes) {
     super();
-    Iterator iter= suffixes.iterator();
+    Iterator iter = suffixes.iterator();
     while (iter.hasNext())
-      addPatternBackward((String)iter.next());
+      addPatternBackward((String) iter.next());
   }
 
   /**
-   * Returns true if the given <code>String</code> is matched by a
-   * suffix in the trie
+   * Returns true if the given <code>String</code> is matched by a suffix in the
+   * trie
    */
   public boolean matches(String input) {
-    TrieNode node= root;
-    for (int i= input.length() - 1; i >= 0; i--) {
-      node= node.getChild(input.charAt(i));
-      if (node == null) 
+    TrieNode node = root;
+    for (int i = input.length() - 1; i >= 0; i--) {
+      node = node.getChild(input.charAt(i));
+      if (node == null)
         return false;
       if (node.isTerminal())
         return true;
@@ -47,16 +47,15 @@ public class SuffixStringMatcher extends TrieStringMatcher {
     return false;
   }
 
-
   /**
    * Returns the shortest suffix of <code>input<code> that is matched,
    * or <code>null<code> if no match exists.
    */
   public String shortestMatch(String input) {
-    TrieNode node= root;
-    for (int i= input.length() - 1; i >= 0; i--) {
-      node= node.getChild(input.charAt(i));
-      if (node == null) 
+    TrieNode node = root;
+    for (int i = input.length() - 1; i >= 0; i--) {
+      node = node.getChild(input.charAt(i));
+      if (node == null)
         return null;
       if (node.isTerminal())
         return input.substring(i);
@@ -69,29 +68,26 @@ public class SuffixStringMatcher extends TrieStringMatcher {
    * or <code>null<code> if no match exists.
    */
   public String longestMatch(String input) {
-    TrieNode node= root;
-    String result= null;
-    for (int i= input.length() - 1; i >= 0; i--) {
-      node= node.getChild(input.charAt(i));
-      if (node == null) 
+    TrieNode node = root;
+    String result = null;
+    for (int i = input.length() - 1; i >= 0; i--) {
+      node = node.getChild(input.charAt(i));
+      if (node == null)
         break;
       if (node.isTerminal())
-        result= input.substring(i);
+        result = input.substring(i);
     }
     return result;
   }
 
   public static final void main(String[] argv) {
-    SuffixStringMatcher matcher= 
-      new SuffixStringMatcher( 
-        new String[] 
-        {"a", "abcd", "bcd", "bcdefg", "defg", "aac", "baz", "foo", "foobar"} );
+    SuffixStringMatcher matcher = new SuffixStringMatcher(new String[] { "a",
+        "abcd", "bcd", "bcdefg", "defg", "aac", "baz", "foo", "foobar" });
 
-    String[] tests= {"a", "ac", "abcd", "abcdefg", "apple", "aa", "aac",
-                    "aaccca", "abaz", "baz", "bazooka", "fo", "foobar",
-                    "kite", };
+    String[] tests = { "a", "ac", "abcd", "abcdefg", "apple", "aa", "aac",
+        "aaccca", "abaz", "baz", "bazooka", "fo", "foobar", "kite", };
 
-    for (int i= 0; i < tests.length; i++) {
+    for (int i = 0; i < tests.length; i++) {
       System.out.println("testing: " + tests[i]);
       System.out.println("   matches: " + matcher.matches(tests[i]));
       System.out.println("  shortest: " + matcher.shortestMatch(tests[i]));

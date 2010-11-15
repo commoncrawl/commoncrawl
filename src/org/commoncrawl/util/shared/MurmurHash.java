@@ -20,52 +20,54 @@ package org.commoncrawl.util.shared;
 
 /**
  * This is a very fast, non-cryptographic hash suitable for general hash-based
- * lookup.  See http://murmurhash.googlepages.com/ for more details.
+ * lookup. See http://murmurhash.googlepages.com/ for more details.
  * 
- * <p>The C version of MurmurHash 2.0 found at that site was ported
- * to Java by Andrzej Bialecki (ab at getopt org).</p>
+ * <p>
+ * The C version of MurmurHash 2.0 found at that site was ported to Java by
+ * Andrzej Bialecki (ab at getopt org).
+ * </p>
  */
 public class MurmurHash {
-	
+
   static final int m = 0x5bd1e995;
   static final int r = 24;
-  
-	public static final int hashInt(int k,int seed) { 
-		int k1 = k * m;
-		int k2 = k1 ^ (k1 >>> r);
-		int k3 = k2 * m;
-		int h1 = seed * m;
-		return h1 ^ k3;
-	}
-	
-	public static final int hashLong(long k,int seed) { 
-		int h = hashInt((int)((k>>32) & Integer.MAX_VALUE),seed);
-		int h2 = hashInt(((int)k),h);
-		return h2;
-	}
-	
-	public static final int hashFloat(float f, int seed) { 
-		return hashInt(Float.floatToIntBits(f),seed);
-	}
-	
-	public static final int hashDouble(double d,int seed) { 
-		return hashLong(Double.doubleToLongBits(d),seed);
-	}
-	
-	public static final int hashBoolean(boolean b, int seed) { 
-		return hashInt((b) ? 1 : 0,seed);
-	}
 
-	public static final int hashString(String s, int seed) {
-		byte[] bytes = s.getBytes();
-		return hash(bytes,bytes.length,seed);
-	}
-	
-	public static final int hash(byte[] data, int length, int seed) {
-		return hash(data,0,length,seed);
-	}
-	
-	public static final int hash(byte[] data,int offset, int length, int seed) {
+  public static final int hashInt(int k, int seed) {
+    int k1 = k * m;
+    int k2 = k1 ^ (k1 >>> r);
+    int k3 = k2 * m;
+    int h1 = seed * m;
+    return h1 ^ k3;
+  }
+
+  public static final int hashLong(long k, int seed) {
+    int h = hashInt((int) ((k >> 32) & Integer.MAX_VALUE), seed);
+    int h2 = hashInt(((int) k), h);
+    return h2;
+  }
+
+  public static final int hashFloat(float f, int seed) {
+    return hashInt(Float.floatToIntBits(f), seed);
+  }
+
+  public static final int hashDouble(double d, int seed) {
+    return hashLong(Double.doubleToLongBits(d), seed);
+  }
+
+  public static final int hashBoolean(boolean b, int seed) {
+    return hashInt((b) ? 1 : 0, seed);
+  }
+
+  public static final int hashString(String s, int seed) {
+    byte[] bytes = s.getBytes();
+    return hash(bytes, bytes.length, seed);
+  }
+
+  public static final int hash(byte[] data, int length, int seed) {
+    return hash(data, 0, length, seed);
+  }
+
+  public static final int hash(byte[] data, int offset, int length, int seed) {
 
     int h = seed ^ length;
 
