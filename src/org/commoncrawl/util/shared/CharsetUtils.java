@@ -60,7 +60,7 @@ public class CharsetUtils {
     if (urlMetadata._charset == null && crawlData != null) {
 
       if (urlMetadata._contentType != null
-          && MimeTypeFilter.isValidTextType(urlMetadata._contentType)) {
+          && MimeTypeFilter.isTextType(urlMetadata._contentType)) {
         // try to detect the charset from the stream ...
         String detectedCharset = CharsetUtils
             .detetechCharacterEncoding(crawlData);

@@ -1,5 +1,6 @@
 package org.commoncrawl.util.shared;
 
+import java.util.LinkedList;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -12,26 +13,59 @@ public class MimeTypeFilter {
                                                                 .compile("^([^a-zA-Z0-9]*)([a-zA-Z0-9-/\\.+]*).*");
   private final static Pattern       APPLICATION_TYPE_REGEX = Pattern
                                                                 .compile("^application/(.*)");
+  
+  private final static Pattern       TYPE_SUBTYPE_EXTRACTION_REGEX = Pattern
+                                                          .compile("(.+)/(.+)");
+  
+  /*
+  private final static Pattern       LOOSE_TEXT_SUBTYPES_MATCHER = Pattern
+                                                          .compile("[\\-\\.]*([^\\+]*\\+)*(txt|text|plain|html|atom|xml|xhtml|css|pdf|postscript|dtd|rss|vcard|rtf|csv|javascript|json)(\\+.*)*");
+  */
+  private final static Pattern       SUBTYPE_LEFT_AND_RIGHT_PART_MATCHER = Pattern
+                                                                    .compile("[\\-\\.\\+]*(x\\-|vnd\\.)*([^\\+]*)\\+*([a-z]*)(\\+.*)*");
+  
+  private final static Pattern       TEXT_SUBTYPES_MATCHER = Pattern
+  .compile("(txt|text|plain|html|atom|xml|xhtml|css|pdf|postscript|dtd|rss|vcard|rtf|csv|javascript|json|perl|ruby|java|text-javascript|asp|php|doc|py|c|cc|c++|cxx|m|h)");
+
+  private final static Pattern       HTML_SUBTYPES_MATCHER = Pattern
+  .compile("(xhtml|html)");
+
+  /*  
+  private final static Pattern       HTML_PARSER_COMPATIBLE_TEXT_SUBTYPES_MATCHER = Pattern
+  .compile("[\\-\\.]*(([^\\+]*\\+)*(xhtml|html)(\\+xml)*");
+  */
+  
   public static final String         NO_TYPE_MIMETYPE       = "no-type";
-  private static PrefixStringMatcher invalidBinaryTypesMatcher;
+  private static PrefixStringMatcher knownBinaryTypesMatcher;
   private static SuffixStringMatcher invalidExtensionMatcher;
-  private static SuffixStringMatcher validAppTypesMatcher;
-  private static SuffixStringMatcher validTextTypesMatcher;
-  private static PrefixStringMatcher excludedMimeTypesMatcher;
+  private static SuffixStringMatcher textValidAppTypesMatcher;
+  private static SuffixStringMatcher otherValidAppTypesMatcher;
+  private static PrefixStringMatcher otherExcludedPrimaryMimeTypeMatcher;
+  private static PrefixStringMatcher alwaysValidPrimaryTextTypesMatcher;
+  private static String knownBinaryTypes[];
+  private static String validPrimaryTextTypes[];
+  private static String invalidExtensions[];
+  private static String textValidApplicationTypes[];
+  private static String otherValidApplicationTypes[];
+  
 
   static {
 
-    String binaryTypes[] = { "binary",
-    // "octet",
-      "image", "audio", "video", "true-type/font", "x-epoc/x-sisx-app" };
+    knownBinaryTypes = new String[]{ "binary",
+      "octet","file",
+      "image", "audio", "video", "true-type", "x-epoc" };
 
-    invalidBinaryTypesMatcher = new PrefixStringMatcher(binaryTypes);
+    knownBinaryTypesMatcher = new PrefixStringMatcher(knownBinaryTypes);
 
-    String excludedMimeTypes[] = { "chemical", "file/compress", "plugin" };
+    String otherExcludedPrimaryMimeTypes[] = { "chemical", "plugin" };
 
-    excludedMimeTypesMatcher = new PrefixStringMatcher(excludedMimeTypes);
+    otherExcludedPrimaryMimeTypeMatcher = new PrefixStringMatcher(otherExcludedPrimaryMimeTypes);
+    
+    validPrimaryTextTypes = new String[]{ "text", "plain", "message","multipart" };
+    
+    alwaysValidPrimaryTextTypesMatcher = new PrefixStringMatcher(validPrimaryTextTypes);
 
-    String invalidExtensions[] = { "gif", "jpg", "jpeg", "bmp", "png", "tif",
+    invalidExtensions = new String[] { "gif", "jpg", "jpeg", "bmp", "png", "tif",
       "tiff",
       "ico",
       // "eps",
@@ -66,27 +100,87 @@ public class MimeTypeFilter {
 
     invalidExtensionMatcher = new SuffixStringMatcher(invalidExtensions);
 
-    String validApplicationTypes[] = { "pdf", "text", "acrobat", "atom", "xml",
-      "doc", "x-texinfo", "x-tex", "tar", "pdf", "x-latex", "wordperfect5.1",
-      "wordperfect", "winhlp",
+    textValidApplicationTypes = 
+      new String[] { 
+        
+        "wap.xhtml+xml",
+        "acrobat", 
+        "acroread",
+        "dot", 
+        "texinfo", 
+        "tex",
+        "text-java", 
+        "oasis.opendocument.text",
+        "sun.xml.writer",
+        "groove-vcard",
+        "ms-works",
+        "pdf",
+        "word-doc",
+        "httpd-php",
+        "httpd-php-source",
+        "httpd.php",
+        "mscardfile",
+        "server-parsed-html",
+        "xml-dtd",
+    };
+    
+    otherValidApplicationTypes = 
+    new String[] {
+      "tar", 
+      "latex", 
+      "wordperfect5.1",
+      "wordperfect", 
+      "winhlp",
+      "google-earth.kml", 
+      "google-earth.kml+xml",
+      "google-earth.kml+xml kml", 
+      "google-earth.kmz",
+      "google-earth.kmz kmz",
+      "openxmlformat", 
+      "powerpoint",
+      "ms-powerpoint",
+      "mspowerpoint",
+      "keyhole", 
+      "kml", 
+      "ms-excel", 
+      "msaccess",
+      "msexcel", 
+      "excel",  
+      "oasis.opendocument.spreadsheet",
+      "oasis.opendocument.presentation",
+      "oasis.opendocument.spreadsheet",
+      "openxmlformats",
+      "sun.xml.calc",
+      "cardfile",
+      "mspublisher",
+      "shockwave-flash",
 
-      "vnd.google-earth.kml", "vnd.google-earth.kml+xml",
-      "vnd.google-earth.kml+xml kml", "vnd.google-earth.kmz",
-      "vnd.google-earth.kmz kmz",
+      "openxmlformat",
+      "lotus",
+      "ms-word",
+      "msword",
+      "ms-htmlhelp",
+      "ms-project",
+      "msword-doc",
+      "xls"
+    };
 
-      "vcard", "openxmlformat", "text", "char", "text-java", "rtf", "tabledit",
-      "powerpoint", "keyhole", "kml", "javascript", "vnd.ms-excel", "ms-excel",
-      "msexcel", "excel", "x-ms-excel", "x-msexcel", "x-excel",
-      "vnd.oasis.opendocument.spreadsheet", "octet-stream" };
+    textValidAppTypesMatcher = new SuffixStringMatcher(textValidApplicationTypes);
+    otherValidAppTypesMatcher = new SuffixStringMatcher(otherValidApplicationTypes);
+    
+    
+    String validMessageTypes[] = { 
+        "news",
+        "rfc822"
+    };
 
-    validAppTypesMatcher = new SuffixStringMatcher(validApplicationTypes);
-
-    String validTextTypes[] = { "text", "plain", "html", "atom", "xml", "css",
-      "pdf", "rss", "vcard", "openxmlformat", "char", "text-java", "rtf",
-      "javascript" };
-
-    validTextTypesMatcher = new SuffixStringMatcher(validTextTypes);
-
+    
+    String validMultipartTypes[] = { 
+        "form-data",
+        "x-mixed-replace"
+    };
+    
+            
   }
 
   private static String truncateMimeType(String contentType) {
@@ -107,31 +201,127 @@ public class MimeTypeFilter {
     return truncateMimeType(mimeTypeIn).toLowerCase();
   }
 
-  public static boolean checkForExclusion(String mimeType) {
+  public enum MimeTypeDisposition {
+    ACCEPT_TEXT,
+    ACCEPT_HTML,
+    ACCEPT_OTHER,
+    REJECT
+  }
+  
+  
+  public static MimeTypeDisposition checkMimeTypeDisposition(String mimeType) {
 
     if (mimeType == null)
-      return false;
+      return MimeTypeDisposition.ACCEPT_OTHER;
     // first normalize the string ...
     String truncatedMimeType = truncateMimeType(mimeType).toLowerCase();
 
-    if (truncatedMimeType != NO_TYPE_MIMETYPE) {
-      if (invalidExtensionMatcher.matches(truncatedMimeType)) {
-        return true;
-      } else {
-        if (invalidBinaryTypesMatcher.matches(truncatedMimeType)
-            || excludedMimeTypesMatcher.matches(truncatedMimeType)) {
-          return true;
+    if (truncatedMimeType == NO_TYPE_MIMETYPE) {  
+      return MimeTypeDisposition.ACCEPT_OTHER;
+    }
+    
+    else {
+      // do a type sub-type match first ... 
+      Matcher type_subtype_matcher = TYPE_SUBTYPE_EXTRACTION_REGEX.matcher(truncatedMimeType);
+      
+      String primaryType = null;
+      String secondaryType = null;
+      
+      // if string is a type/subtype record 
+      if (type_subtype_matcher.matches()) { 
+        // primary type is first match element
+        primaryType = type_subtype_matcher.group(1);
+        secondaryType = type_subtype_matcher.group(2);
+      }
+      // else if string is strictly a type record 
+      else { 
+        primaryType = truncatedMimeType;
+      }
+      // now if primary type is null or empty ... 
+      if (primaryType == null || primaryType.length() == 0) { 
+        // accept by default ...  
+        return MimeTypeDisposition.ACCEPT_OTHER; 
+      }
+      else {
+        // first check for outright exclusion via primary type 
+        if (knownBinaryTypesMatcher.matches(primaryType) || 
+            otherExcludedPrimaryMimeTypeMatcher.matches(primaryType)) {
+          // reject known binary types ... 
+          return MimeTypeDisposition.REJECT; 
         }
-        Matcher appTypeMatcher = APPLICATION_TYPE_REGEX
-            .matcher(truncatedMimeType);
+        // check for inclusion via primary type 
+        else if (alwaysValidPrimaryTextTypesMatcher.matches(primaryType)) { 
+          if (secondaryType != null) {
+            Matcher m = SUBTYPE_LEFT_AND_RIGHT_PART_MATCHER.matcher(secondaryType);
+            if (m.matches()) { 
+              for (int i=2;i<=3;++i) { 
+                if (m.group(i) != null 
+                    &&
+                    (m.group(i).equals("html")
+                    || m.group(i).equals("xhtml"))) { 
 
-        if (appTypeMatcher.matches()
-            && !validAppTypesMatcher.matches(appTypeMatcher.group(1))) {
-          return true;
+                  return MimeTypeDisposition.ACCEPT_HTML;
+                }
+              }
+            }
+          }
+          // accept no matter what secondary type is ...  
+          return MimeTypeDisposition.ACCEPT_TEXT; 
+        }
+        
+        // check for invalid extension types ...
+        if ((secondaryType != null && invalidExtensionMatcher.exactMatch(secondaryType))
+            || 
+            invalidExtensionMatcher.exactMatch(primaryType)) {
+          // ok reject this guy ... 
+          return MimeTypeDisposition.REJECT;
+        }
+        
+        Matcher typeSubTypeMatcher = (secondaryType != null) ? 
+            SUBTYPE_LEFT_AND_RIGHT_PART_MATCHER.matcher(secondaryType) : 
+              SUBTYPE_LEFT_AND_RIGHT_PART_MATCHER.matcher(primaryType);
+            
+        // ok now see if a secondary type is valid text type .. 
+        if (typeSubTypeMatcher.matches()) {
+          for (int i=2;i<=3;++i) { 
+            if (typeSubTypeMatcher.group(i) != null 
+                &&
+                (typeSubTypeMatcher.group(i).equals("html")
+                || typeSubTypeMatcher.group(i).equals("xhtml"))) { 
+
+              return MimeTypeDisposition.ACCEPT_HTML;
+            }
+          }
+          // next try text types ... 
+          for (int i=2;i<=3;++i) { 
+            if (typeSubTypeMatcher.group(i) != null 
+                && TEXT_SUBTYPES_MATCHER.matcher(typeSubTypeMatcher.group(i)).matches()) { 
+              return MimeTypeDisposition.ACCEPT_TEXT;
+            }
+          }
+        }
+        
+        // ok last but not least ...  
+        // if this is an application type ...  
+        if (secondaryType != null) { 
+          if (secondaryType.startsWith("vnd.")) {
+            secondaryType = secondaryType.substring("vnd.".length());
+          }
+          else if (secondaryType.startsWith("x-")) { 
+            secondaryType = secondaryType.substring("x-".length());
+          }
+          // if secondary type matches accept application type
+          if (textValidAppTypesMatcher.exactMatch(secondaryType)) { 
+            return MimeTypeDisposition.ACCEPT_TEXT;
+          }
+          if (otherValidAppTypesMatcher.exactMatch(secondaryType)) { 
+            return MimeTypeDisposition.ACCEPT_OTHER;  
+          }
         }
       }
+      // reject by default ... 
+      return MimeTypeDisposition.REJECT;
     }
-    return false;
   }
 
   /**
@@ -141,1616 +331,612 @@ public class MimeTypeFilter {
    * @return
    */
   public static boolean isTextType(String contentTypeStr) {
-    if (checkForExclusion(contentTypeStr) == false) {
-
-      // first normalize the string ...
-      String truncatedMimeType = truncateMimeType(contentTypeStr).toLowerCase();
-
-      if (truncatedMimeType.startsWith("text")
-          && (truncatedMimeType.length() == 4 || truncatedMimeType.charAt(4) == '/')) {
-        return true;
-      } else {
-        return validTextTypesMatcher.matches(truncatedMimeType);
-      }
+    MimeTypeDisposition disposition = checkMimeTypeDisposition(contentTypeStr);
+    if (disposition == MimeTypeDisposition.ACCEPT_TEXT || 
+        disposition == MimeTypeDisposition.ACCEPT_HTML) { 
+      return true;
     }
     return false;
-
   }
 
   /**
-   * more restrictive interpretation of what is a valid text type
+   * more restrictive interpretation of what is a valid html type
    */
-  public static boolean isValidTextType(String contentTypeStr) {
-
-    if (checkForExclusion(contentTypeStr) == false) {
-
-      // first normalize the string ...
-      String truncatedMimeType = truncateMimeType(contentTypeStr).toLowerCase();
-
-      return validTextTypesMatcher.matches(truncatedMimeType);
+  public static boolean isValidHTMLType(String contentTypeStr) {
+    return checkMimeTypeDisposition(contentTypeStr) 
+                                          == MimeTypeDisposition.ACCEPT_HTML;
+  }
+  
+  private static class TestRecord {
+    
+    TestRecord(String testString,MimeTypeDisposition disposition,MimeTypeDisposition overrideDisposition) { 
+      _testString = testString;
+      _expectedDisposition = (overrideDisposition == null) ? disposition : overrideDisposition;
     }
-    return false;
+    
+    String              _testString;
+    MimeTypeDisposition _expectedDisposition;
+  }
+  
+  private static void addBinaryTestRecords(LinkedList<TestRecord> testRecordList,String optionalPrefix,String optionalSuffix,MimeTypeDisposition overrideDisposition) { 
+    for (String binaryType : knownBinaryTypes) { 
+      testRecordList.add(new TestRecord(optionalPrefix + binaryType+"/foo" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    }
+    for (String binaryType : knownBinaryTypes) { 
+      testRecordList.add(new TestRecord(optionalPrefix + binaryType + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    }
+  }
+  private static void addValidTextTypeRecords(LinkedList<TestRecord> testRecordList,String optionalPrefix,String optionalSuffix,MimeTypeDisposition overrideDisposition) { 
+    for (String textType : validPrimaryTextTypes) { 
+      testRecordList.add(new TestRecord(optionalPrefix + textType+"/foo" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    }
+    for (String textType : validPrimaryTextTypes) { 
+      testRecordList.add(new TestRecord(optionalPrefix + textType + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    }
+  }
+  private static void addValidHTMLTypeRecords(LinkedList<TestRecord> testRecordList,String optionalPrefix,String optionalSuffix,MimeTypeDisposition overrideDisposition) { 
+    testRecordList.add(new TestRecord(optionalPrefix + "text/html" +optionalSuffix,MimeTypeDisposition.ACCEPT_HTML,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "text/xhtml+xml" +optionalSuffix,MimeTypeDisposition.ACCEPT_HTML,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "text/xhtml" +optionalSuffix,MimeTypeDisposition.ACCEPT_HTML,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "html" +optionalSuffix,MimeTypeDisposition.ACCEPT_HTML,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "xhtml+xml" +optionalSuffix,MimeTypeDisposition.ACCEPT_HTML,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "xhtml" +optionalSuffix,MimeTypeDisposition.ACCEPT_HTML,overrideDisposition));
+  }
+  
+  private static void addOtherValidTextTypeRecords(LinkedList<TestRecord> testRecordList,String optionalPrefix,String optionalSuffix,MimeTypeDisposition overrideDisposition) {
+    
+    testRecordList.add(new TestRecord(optionalPrefix + "txt" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "text" +optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "plain" +optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "atom" +optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "xml" +optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "css" +optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "pdf" +optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "postscript" +optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "dtd" +optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "rss" +optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "vcard" +optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "rtf" +optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "csv" +optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "javascript" +optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "json" +optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));   
   }
 
-  private static String testStrings[] = {
+  
+  private static void addTestApplicationStrings(LinkedList<TestRecord> testRecordList,String optionalPrefix,String optionalSuffix,MimeTypeDisposition overrideDisposition) { 
+    testRecordList.add(new TestRecord(optionalPrefix + "application" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "asf" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/pdf" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/acad" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/acrobat" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/applefile" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/asx" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/atom" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/atom+xml" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/atomserv+xml" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/binary" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/cadstd" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/cap" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/cgi" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/doc" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/download" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/exe" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/filemaker" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/finale" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/fml" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/force-download" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/garmin-data" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/gpx" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/java-archive" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/java-vm" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/javascript" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/json" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/keyhole" + optionalSuffix,MimeTypeDisposition.ACCEPT_OTHER,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/kml" + optionalSuffix,MimeTypeDisposition.ACCEPT_OTHER,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/kml+xml" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/labview.app" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/lotus" + optionalSuffix,MimeTypeDisposition.ACCEPT_OTHER,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/mac-binhex40" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/maple" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/marc" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/mathematica" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/mathematica-package" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/metalink+xml" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/mplayer2" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/mp_arc-mixed" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/ms-powerpoint" + optionalSuffix,MimeTypeDisposition.ACCEPT_OTHER,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/ms-word" + optionalSuffix,MimeTypeDisposition.ACCEPT_OTHER,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/msaccess" + optionalSuffix,MimeTypeDisposition.ACCEPT_OTHER,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/msi" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/mspowerpoint" + optionalSuffix,MimeTypeDisposition.ACCEPT_OTHER,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/msstreets" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/msword" + optionalSuffix,MimeTypeDisposition.ACCEPT_OTHER,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/nwc" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/octect-stream" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/octet-stream" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/octetstream" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/octet_stream" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/opensearchdescription+xml" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/pdf" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/pdslabel" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/perl" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/pff" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/pgp-keys" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/pgp-signature" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/pls+xml" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/plt-scheme-package" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/postscript" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/powerpoint" + optionalSuffix,MimeTypeDisposition.ACCEPT_OTHER,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/pps" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/prc" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/prs.plucker" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/rar" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/rdf+xml" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/riscos" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/rsd" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/rsd+xml" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/rss+xml" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/rtf" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/save" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/smil" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/smil+xml" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/tabledit" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/TEXT" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/text-javascript" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/text-java" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/ti" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/torrent" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/unknown" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/unknown15" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/unkown" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/vcard" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/vnd.adobe.air-application-installer-package+zip" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/vnd.adobe.apollo-application-installer-package+zip" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/vnd.dpgraph" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/vnd.google-earth.kml" + optionalSuffix,MimeTypeDisposition.ACCEPT_OTHER,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/vnd.google-earth.kml+xml" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/vnd.google-earth.kmz" + optionalSuffix,MimeTypeDisposition.ACCEPT_OTHER,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/vnd.groove-vcard" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/vnd.mozilla.xul+xml" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/vnd.ms-asf" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/vnd.ms-excel" + optionalSuffix,MimeTypeDisposition.ACCEPT_OTHER,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/vnd.ms-htmlhelp" + optionalSuffix,MimeTypeDisposition.ACCEPT_OTHER,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/vnd.ms-powerpoint" + optionalSuffix,MimeTypeDisposition.ACCEPT_OTHER,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/vnd.ms-project" + optionalSuffix,MimeTypeDisposition.ACCEPT_OTHER,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/vnd.ms-word" + optionalSuffix,MimeTypeDisposition.ACCEPT_OTHER,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/vnd.ms-works" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/vnd.musician" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/vnd.oasis.opendocument.graphics" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/vnd.oasis.opendocument.presentation" + optionalSuffix,MimeTypeDisposition.ACCEPT_OTHER,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/vnd.oasis.opendocument.spreadsheet" + optionalSuffix,MimeTypeDisposition.ACCEPT_OTHER,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/vnd.oasis.opendocument.text" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/vnd.openxmlformats" + optionalSuffix,MimeTypeDisposition.ACCEPT_OTHER,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/vnd.palm" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/vnd.pdf" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/vnd.sun.xml.calc" + optionalSuffix,MimeTypeDisposition.ACCEPT_OTHER,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/vnd.sun.xml.draw." + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/vnd.sun.xml.impress" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/vnd.sun.xml.writer" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/vnd.symbian.install" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/vnd.wap.xhtml+xml" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/vnd.wordperfect" + optionalSuffix,MimeTypeDisposition.ACCEPT_OTHER,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/winhlp" + optionalSuffix,MimeTypeDisposition.ACCEPT_OTHER,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/word-doc" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/wordperfect" + optionalSuffix,MimeTypeDisposition.ACCEPT_OTHER,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/wordperfect5.1" + optionalSuffix,MimeTypeDisposition.ACCEPT_OTHER,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-7z-compressed" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-acroread" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-amstex" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-apple-diskimage" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-arachne-package" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-asap" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-asp" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-autocad" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-bio" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-bittorrent" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-blorb" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-bzip" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-bzip2" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-cdf" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-cdlink" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-chat" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-chess-pgn" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-compress" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-csh" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-director" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-doc" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-dot" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-download" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-dreamcast-vms-info" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-dvi" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-dzip" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-endnote-refer" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-executable" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-flac" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-font-ttf" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-forcedownload" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-glulx" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-go-sgf" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-graphing-calculator" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-gzip" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-httpd-php" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-httpd-php-source" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-httpd-php3" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-httpd-php4" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-httpd-php5" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-httpd.php" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-hwp" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-imagemap" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-incredimail" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-install" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-install-instructions" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-intkey" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-ip" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-ipix" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-iso9660-image" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-jar" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-java" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-java-archive" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-java-jnlp-file" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-javascript" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-koan" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-kpresenter" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-latex" + optionalSuffix,MimeTypeDisposition.ACCEPT_OTHER,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-life" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-maker" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-makeself" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-maple" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-midi" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-mpeg4" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-mplayer2" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-ms-reader" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-ms-wmd" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-ms-wmz" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-mscardfile" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-msdos-program" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-msdownload" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-msi" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-mspublisher" + optionalSuffix,MimeTypeDisposition.ACCEPT_OTHER,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-msword" + optionalSuffix,MimeTypeDisposition.ACCEPT_OTHER,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-msword-doc" + optionalSuffix,MimeTypeDisposition.ACCEPT_OTHER,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-netcdf" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-nwc" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-octet-stream" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-octetstream" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-opera-configuration-language" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-opera-configuration-menu" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-pdf" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-perl" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-php" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-pilot" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-qcshow" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-quicktime-media-link" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-quicktimeplayer" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-rar" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-rar-compressed" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-redhat-package-manager" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "Application/x-research-info-systems" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-server-parsed-html" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-sh" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-shar" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-shellscript" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-shockwave-flash" + optionalSuffix,MimeTypeDisposition.ACCEPT_OTHER,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-shockwave-flash2-preview" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-smaf" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-stuffit" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-stuffitx" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-sysquake" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-tar" + optionalSuffix,MimeTypeDisposition.ACCEPT_OTHER,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-tcl" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-tex" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-texinfo" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-trash" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-troff" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-troff-man" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-troff-ms" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-unknown" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-unknown-content-type-pdbFile" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-vmarc" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-wais-source" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-windows-gadget" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-wp" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-x509-ca-cert" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-x509-cert" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-xfig" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-xpinstall" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-zip" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-zip-compressed" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x-zmachine" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/x.atom+xml" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/xhtml+xml" + optionalSuffix,MimeTypeDisposition.ACCEPT_HTML,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/xls" + optionalSuffix,MimeTypeDisposition.ACCEPT_OTHER,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/xml" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/xml-dtd" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/xslt+xml" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/xspf+xml" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/xyz123" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/zip" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "application/{$sAppType}" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));    
+  }
+  
+  private static void addAudioTestRecords(LinkedList<TestRecord> testRecordList,String optionalPrefix,String optionalSuffix,MimeTypeDisposition overrideDisposition) { 
+    testRecordList.add(new TestRecord(optionalPrefix + "audio-x/mpegurl" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "audio/basic" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "audio/m3u" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "audio/m4a" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "audio/m4b" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "audio/midi" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "audio/mp3" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "audio/mp4" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "audio/mp4a-latm" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "audio/mpeg" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "audio/mpeg3" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "audio/mpegurl" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "audio/mpg" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "audio/playlist" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "audio/quicktime" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "audio/reason" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "audio/scpls" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "audio/unknown" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "audio/x-aiff" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "audio/x-m3u" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "audio/x-m4a" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "audio/x-m4b" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "audio/x-mp3" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "audio/x-mpeg," + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "audio/x-mpegurl" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "audio/x-mpegurl.m3u" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "audio/x-mpequrl" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "audio/x-ms-asf" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "audio/x-ms-asx" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "audio/x-ms-wax" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "audio/x-ms-wma" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "audio/x-pd" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "audio/x-pn-realaudio" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "audio/x-ptb" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "audio/x-scpls" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "audio/x-twinvq" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "audio/x-wav" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));    
+  }
+  
+  private static void addImageTestRecords(LinkedList<TestRecord> testRecordList,String optionalPrefix,String optionalSuffix,MimeTypeDisposition overrideDisposition) { 
+    testRecordList.add(new TestRecord(optionalPrefix + "image" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "image/" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "image/*" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "image/autocad" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "image/bmp" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "image/gif" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "image/ico" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "image/jp2" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "image/jpeg" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "image/jpeg,image/pjpeg" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "image/jpg" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "image/pak" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "image/pcx" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "image/pdf" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "image/pjpeg" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "image/pk3" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "image/png" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "image/spr" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "image/svg+xml" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "image/tiff" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "image/vnd" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "image/vnd.djvu" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "image/vnd.dwg" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "image/vnd.dxf" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "image/vnd.ms-modi" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "image/vnd.nok-oplogo-color" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "image/vnd.wap.wbmp" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "image/x-coreldraw" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "image/x-dcraw" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "image/x-djvu" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "image/x-icon" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "image/x-ms-bmp" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "image/x-pcx" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "image/x-pict" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "image/x-png" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "image/x-portable-pixmap" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "image/x-rgb" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "image/x-urt" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "image/x-xbitmap" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "image/x.djvu" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "images/jpeg" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));    
+  }
+  
+  private static void addTestTextRecords(LinkedList<TestRecord> testRecordList,String optionalPrefix,String optionalSuffix,MimeTypeDisposition overrideDisposition) { 
+    testRecordList.add(new TestRecord(optionalPrefix + "text/abc.vnd" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "text/bib" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "text/calendar" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "text/comma-separated-values" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "text/css" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "text/csv" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "text/directory" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "text/htm" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "text/html" + optionalSuffix,MimeTypeDisposition.ACCEPT_HTML,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "text/html/srt" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "text/javascript" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "text/js" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "text/json" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "text/langfile" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "text/pdf" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "text/plain" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "text/rdf" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "text/rdf+n3" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "text/richtext" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "text/rss" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "text/rtf" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "text/sgml" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "text/tab-separated-values" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "text/texmacs" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "text/text" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "text/troff" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "text/vbscript" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "text/vcard" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "text/vnd.abc" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "text/vnd.sun.j2me.app-descriptor" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "text/vnd.wap.wml" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "text/x-bibtex" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "text/x-c" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "text/x-c++hdr" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "text/x-c++src" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "text/x-card" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "text/x-chdr" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "text/x-comma-separated-values" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "text/x-config" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "text/x-csrc" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "text/x-diff" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "text/x-dsrc" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "text/x-emacs-lisp" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "text/x-fortran" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "text/x-hamlet-action" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "text/x-hdml" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "text/x-ical" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "text/x-java" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "text/x-java-source" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "text/x-log" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "text/x-opml" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "text/x-pascal" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "text/x-patch" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "text/x-perl" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "text/x-python" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "text/x-registry" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "text/x-scheme" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "text/x-server-parsed-html" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "text/x-sh" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "text/x-sql" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "text/x-suse-ymp" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "text/x-tex" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "text/x-vCalendar" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "text/x-vCard" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "text/x-versit" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "text/xml" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+  }
+  
+  private static void addTestVideoRecords(LinkedList<TestRecord> testRecordList,String optionalPrefix,String optionalSuffix,MimeTypeDisposition overrideDisposition) { 
+    testRecordList.add(new TestRecord(optionalPrefix + "video/3gpp" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "video/asx" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "video/flc" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "video/m4v" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "video/mp4" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "video/mp4v-es" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "video/mpeg" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "video/quicktime" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "video/unknown" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "video/x-fli" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "video/x-m4v" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "video/x-mp4" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "video/x-ms-af" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "video/x-ms-asf" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "video/x-ms-asf-plugin" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "video/x-ms-asx" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "video/x-ms-wax" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "video/x-ms-wmv" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "video/x-ms-wmx" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "video/x-ms-wvx" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "video/x-msvideo" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "video/x-pv-mp4" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "video/x-unknown" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));    
+  }
+  
+  private static void addMiscelaneousTestRecords(LinkedList<TestRecord> testRecordList,String optionalPrefix,String optionalSuffix,MimeTypeDisposition overrideDisposition) { 
+    testRecordList.add(new TestRecord(optionalPrefix + "gif" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "jpg" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "pdf" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "png" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "tif" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "zip" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "text" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "html" + optionalSuffix,MimeTypeDisposition.ACCEPT_HTML,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "xml" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "pdf" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "txt" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "unknown" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "x-httpd-php" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "x-mapp-php" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "x-mapp-php4" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
 
-      "text/html",
-      "text/html; charset=UTF-8",
-      "text/html; charset=utf-8",
-      "text/html; charset=ISO-8859-1",
-      "text/html; charset=iso-8859-1",
-      "application/pdf",
-      "text/html;charset=UTF-8",
-      "text/html;charset=ISO-8859-1",
-      "text/html;charset=utf-8",
-      "text/html; charset=windows-1251",
-      "text/plain",
-      "text/html;charset=iso-8859-1",
-      "application/msword",
-      "text/html; charset=windows-1252",
-      "text/html; charset=gb2312",
-      "image/jpeg",
-      "text/xml",
-      "text/html;charset=euc-jp",
-      "application/xml",
-      "text/html; charset=Shift_JIS",
-      "text/html; charset=GB2312",
-      "text/html; charset=windows-1256",
-      "text/html; charset=WINDOWS-1251",
-      "text/html; charset=EUC-JP",
-      "application/x-shockwave-flash",
-      "text/html; charset=ISO-8859-9",
-      "text/xml; charset=UTF-8",
-      "image/gif",
-      "text/html; charset=iso-8859-15",
-      "text/html; charset=iso-8859-9",
-      "text/xml;charset=UTF-8",
-      "text/html; Charset=utf-8",
-      "text/html;charset=GBK",
-      "text/xml; charset=utf-8",
-      "text/html; charset=ISO-8859-15",
-      "text/html; charset=gbk",
-      "text/plain; charset=UTF-8",
-      "text/html; charset=Windows-1252",
-      "text/html; Charset=UTF-8",
-      "audio/x-mpegurl",
-      "text/html; charset=none",
-      "text/html; charset=GBK",
-      "text/html; charset=shift_jis",
-      "text/plain; charset=ISO-8859-1",
-      "text/html; Charset=ISO-8859-1",
-      "text/html; charset=euc-jp",
-      "text/html; charset=US-ASCII",
-      "text/html; charset=SJIS",
-      "text/html;",
-      "text/html; charset=utf-8;",
-      "text/html; charset=iso-8859-2",
-      "application/octet-stream",
-      "application/rss+xml; charset=utf-8",
-      "NULL",
-      "text/html;charset=Cp1252",
-      "text/html; charset=koi8-r",
-      "text/html; Charset=iso-8859-1",
-      "text/html; charset='UTF-8'",
-      "image/png",
-      "text/html; charset=ISO-8859-2",
-      "text/html; charset=ISO-8859-1;",
-      "application/x-javascript",
-      "text/html; charset=windows-1250",
-      "application/atom+xml; charset=UTF-8",
-      "text/html; charset=TIS-620",
-      "text/html; charset=windows-1254",
-      "text/html; charset=",
-      "text/xml;charset=utf-8",
-      "text/html; charset=ISO8859-1",
-      "text/html; charset=us-ascii",
-      "application/xhtml+xml",
-      "text/html; charset=utf8",
-      "application/rss+xml",
-      "text/rtf",
-      "text/html; charset=big5",
-      "text/html; charset=cp1251",
-      "text/html; charset=iso8859-15",
-      "text/css",
-      "video/x-ms-asf",
-      "text/html; charset=Windows-1251",
-      "text/html;charset=Windows-31J",
-      "application/rdf+xml",
-      "text/html;charset=Shift_JIS",
-      "text/html; charset=latin1",
-      "text/html; Charset=windows-1252",
-      "text/html;charset=EUC-JP",
-      "text/plain; charset=iso-8859-1",
-      "text/html; charset=WINDOWS-1252",
-      "text/html; charset=iso8859-1",
-      "text/html; charset=EUC-JP;",
-      "text/html; charset=None",
-      "application/xhtml+xml; charset=utf-8",
-      "text/HTML",
-      "text/html; charset=windows-1252;",
-      "text/html;charset=gbk",
-      "application/xhtml+xml; charset=UTF-8",
-      "text/javascript",
-      "application/xml; charset=utf-8",
-      "text/html;charset=gb2312",
-      "text/html;charset=utf-8;",
-      "text/html; charset=tis-620",
-      "text/html; charset=Latin1",
-      "text/html;  charset=iso-8859-1",
-      "text/xml; charset=ISO-8859-1",
-      "text/html; charset='iso-8859-1'",
-      "text/html;charset=windows-1251",
-      "application/x-bittorrent",
-      "text/html; charset=Windows-31J",
-      "application/atom+xml",
-      "text/html; Charset=windows-1251",
-      "application/xml; charset=iso-8859-1",
-      "text/html; Charset=GB2312",
-      "application/x-pdf",
-      "application/x-javascript; charset=utf-8",
-      "text/html; pageEncoding=UTF-8;charset=UTF-8",
-      "application/mac-binhex40",
-      "text/html; Charset=windows-1256",
-      "application/xml; charset=UTF-8",
-      "text/html; Charset=windows-1254",
-      "text/xml; charset=iso-8859-1",
-      "text/html;charset=big5",
-      "image/pjpeg",
-      "text/html; charset=ISO_8859-1",
-      "application/x-tar",
-      "text/plain; charset=utf-8",
-      "text/html; charset=Big5",
-      "text/html;charset = utf-8",
-      "text/html; charset=.utf8",
-      "text/html; charset=Windows-1253",
-      "text/html; charset=SHIFT_JIS",
-      "text/html; charset=iso-8859-1;",
-      "text/html;charset=8859_1",
-      "text/html; charset=euc-kr",
-      "text/html;Charset=ISO-8859-1",
-      "application/xhtml+xml;charset=utf-8",
-      "text/x-server-parsed-html",
-      "application/x-httpd-php",
-      "application/rsd+xml",
-      "text/html; charset=EUC-KR",
-      "text/html; Charset=gb2312",
-      "text/html; charset='utf-8'",
-      "text/javascript; charset: UTF-8",
-      "text/plain; charset=GB2312",
-      "text/html; charset=UTF8",
-      "text/javascript; charset=utf-8",
-      "text/html; charset=ISO-8895-1",
-      "application/atom+xml; charset=utf-8",
-      "text/html;charset=WINDOWS-1252",
-      "application/rtf",
-      "application/x-dvi",
-      "text/html; charset=iso-8859-7",
-      "application/xml; charset=ISO-8859-1",
-      "video/mp4",
-      "text/xml;charset=ISO-8859-1",
-      "text/html; charset=shift-jis",
-      "text/html; Charset=",
-      "text/html; Charset=iso-8859-9",
-      "application/xhtml+xml; charset=iso-8859-1",
-      "text/html; charset=ASCII",
-      "text/html;;charset=UTF-8",
-      "text/html;charset=iso-8859-15",
-      "text/html;charset=MS932",
-      "text/html; charset=0",
-      "text/html; charset=en_US",
-      "text/html;charset=ISO-8859-15",
-      "text/html;ISO-8859-1; charset=UTF-8",
-      "audio/x-ms-wax",
-      "text/html; encoding: UTF-8; charset=UTF-8",
-      "text/html;charset=Big5",
-      "text/html;charset=GB2312",
-      "text/plain; charset=gb2312",
-      "text/html;charset=ISO8859_1",
-      "application/x-bzip2",
-      "application/xml;charset=utf-8",
-      "text/html; charset=Windows-1255",
-      "text/html; charset=Cp1252",
-      "text/html; charset= iso-8859-15",
-      "text/html; charset=ISO-8859-7",
-      "text/xml; charset='UTF-8'",
-      "text/html; charset: UTF-8",
-      "text/html; UTF-8;charset=UTF-8",
-      "text/html; charset=Windows-1257",
-      "text/html; charset=WINDOWS-1256",
-      "text/html; charset=null",
-      "text/html; charset: utf-8",
-      "text/html;charset=",
-      "chemical/x-pdb",
-      "text/html;charset=default",
-      "text/html;charset=windows-1252",
-      "text/html;charset=iso8859_1",
-      "text/html;charset=shift_jis",
-      "text/html;charset=shift-jis",
-      "text/xml;charset=iso-8859-1",
-      "text/html; charset=iso-2022-jp",
-      "video/x-ms-wvx",
-      "model/vrml",
-      "audio/x-scpls",
-      "text/html; charset=latin1_swedish_ci",
-      "Text/Html; charset=koi8-u",
-      "text/html; charset=cp-1251",
-      "text/html; CHARSET=iso-8859-1",
-      "message/rfc822",
-      "text/html; charset=windows-1255",
-      "text/xml; charset=utf-8;",
-      "application/xhtml+xml;charset=UTF-8",
-      "application/vnd.ms-powerpoint",
-      "text/css; charset=utf-8",
-      "text/html;charset=EUC-KR",
-      "text/html;charset='utf-8'",
-      "text/html;charset=euc-kr",
-      "application/javascript; charset=utf-8",
-      "application/xhtml+xml;charset=iso-8859-1",
-      "application/atom+xml; charset=iso-8859-1",
-      "text/html; charset=windows-874",
-      "image/bmp",
-      "application/rar",
-      "application/rss+xml; charset=iso-8859-1",
-      "application/pdf; charset=UTF-8",
-      "image/svg+xml",
-      "application/rss+xml; charset=UTF-8",
-      "text/html; utf-8",
-      "audio/x-aiff",
-      "text/plain; charset=gb18030",
-      "application/vnd.google-earth.kml+xml",
-      "application/x-tex",
-      "text/html; charset=en",
-      "application/rsd+xml; charset=utf-8",
-      "text/html; charset=ISO8859_1",
-      "application/xhtml+xml; charset=",
-      "text/html; charset=WINDOWS-1250",
-      "text/html; charset=iso.8859-15",
-      "text/html; charset=UTF-8; lang=en-US",
-      "video/x-ms-wmv",
-      "application/xml;charset=UTF-8",
-      "application/x-rar-compressed",
-      "application/rdf+xml; charset=utf-8",
-      "text/html; charset=iso-8559-1",
-      "text/html;charset=SHIFT_JIS",
-      "text/html; charset=latin5",
-      "text/html; charset=windows-1251;",
-      "Application/pdf",
-      "text/html; encoding=utf-8",
-      "application/postscript",
-      "text/html;  charset=ISO-8859-1",
-      "image/gif;",
-      "text/html; charset=win1251",
-      "audio/x-mpegurl;charset=UTF-8",
-      "text/html; charset=UTF-8; Charset=UTF-8",
-      "text/html; charset=8859-9",
-      "text/html;charset=SJIS",
-      "image/jpeg; charset=utf-8",
-      "application/pdf;charset=UTF-8",
-      "text/html; charset=BIG5",
-      "image/jpg",
-      "text/html; charset: UTF-8; charset=UTF-8",
-      "text/html; charset=x-sjis",
-      "text/html; charset=sjis",
-      "text/html; charset=euc_kr",
-      "application/vnd.google-earth.kmz",
-      "text/html; charset=CP1251",
-      "audio/mpegurl",
-      "audio/mp4",
-      "text/html; charset=ISO-8559-1",
-      "text/html; charset='ISO-8859-1'",
-      "application/pgp-signature",
-      "text/html; charset=enable",
-      "text/calendar",
-      "text/html; charset=WINDOWS-1257",
-      "text/html; charset=UTF-8;",
-      "application/rss+xml; charset=ISO-8859-1",
-      "text/plain; charset=windows-1251",
-      "text/html; charset=zh-CN",
-      "application/xml; charset=windows-1252",
-      "text/html;charset=iso-8859-1; charset=ISO-8859-1",
-      "application/force-download",
-      "image/jpeg; charset=iso-8859-15",
-      "text/html; charset: windows-1252",
-      "text/html; charset=BS_4730",
-      "text/html; charset=ISO8859-2",
-      "application/rss+xml;charset=ISO-8859-1",
-      "application/x-chess-pgn",
-      "text/html; charset=Windows-1250",
-      "text/html; charset=UTF-8ISO-8859-1",
-      "application/x-gzip",
-      "text/html;charset=iso-8859-2",
-      "image/BMP",
-      "text/html; charset=windows-1257",
-      "application/x-xpinstall",
-      "application/x-troff",
-      "text/html; charset=zh_CN",
-      "text/html; charset=utf-8; charset=utf-8",
-      "text/html; charset=win-1251",
-      "text/html;; charset=iso-8859-1",
-      "text/plain;charset=UTF-8",
-      "text/html; qs=.9",
-      "application/atom+xml; charset=ISO-8859-1",
-      "text/html; charset=MS932",
-      "application/pdf; charset=iso-8859-1",
-      "application/x-go-sgf",
-      "application/java-archive",
-      "text/html; charset=iso.8859-1",
-      "text/html; charset='tis-620'",
-      "text/html; Charset=Windows-1252",
-      "text/html; charset=ISO-8859",
-      "application/atom+xml;charset=ISO-8859-1",
-      ";charset=ISO-8859-1",
-      "application/vnd.oasis.opendocument.graphics",
-      "application/x-compress",
-      "text/html; charset= iso-8859-9",
-      "video/quicktime",
-      "text/html; charset=Windows-1256",
-      "application/vnd.ms-excel",
-      "audio/mpeg",
-      "Image/jpeg",
-      "application/x-httpd-php3",
-      "text/html;charset=utf8",
-      "application/rdf+xml; charset=UTF-8",
-      "text/HTML; Charset=utf-8",
-      "text/html; charset=iso-8859-1; Charset=iso-8859-1",
-      "text/html; charset=iso-8895-15",
-      "application/rss+xml; charset=ISO-8859-15",
-      "text/html; charset=0ff",
-      "text/html; charset=utf-8; Charset=UTF-8",
-      "application/opensearchdescription+xml",
-      "text/html; charset=ks_c_5601-1987",
-      "text/html;ISO-8859-1",
-      "text/html; Charset=Windows-1251",
-      "text/html; charset=Windows",
-      "audio/playlist",
-      "text/html; charset=8859_1",
-      "application/zip",
-      "text/x-vCard",
-      "text/html; charset=ISO-8858-1",
-      "text/html; charset=EUC_JP",
-      "text/html;  charset=tis-620",
-      "Text/HTML",
-      "text/html; charset='ISO_8859-1'; name='CGISSI'",
-      "text/html; profile=xhtml",
-      "text/html; charset=ISO-2022-JP",
-      "text/html; charset=KSC5601",
-      "application/x-apple-diskimage",
-      "text/xml; charset='utf-8'",
-      "text/html;charset=iso-8859-9",
-      "application/nwc",
-      "text/html; charset=off",
-      "text/csv",
-      "application/smil",
-      "text/html; charset=windows1251",
-      "text/html; charset ISO-8859-1; charset=ISO-8859-1",
-      "text/xml; Charset=gb2312",
-      "text/x-vcard",
-      "image/jpeg; charset=iso-8859-1",
-      "text/html;   charset=utf-8",
-      "text/html; charset=ISO-8995-1",
-      "text/html; charset=Latin-1",
-      "text/html; charset=ISO-88591",
-      "text/html;charset=ISO-8859-4",
-      "text/html; charset=latin-1",
-      "text/html; charset=utf-8lias",
-      "text/xml; charset=gb2312",
-      "text/html; charset: ISO-8859-1",
-      "text/xml; Charset=utf-8",
-      "text/x-java",
-      "text/xml; charset=iso-8859-15",
-      "text/xml; charset=windows-1251",
-      "text/html;  charset=utf-8",
-      "audio/x-pn-realaudio",
-      "application/octet-stream; Charset=UTF-8",
-      "application/xhtml+xml; Charset=ISO-8859-1",
-      "text/html; iso-8859-1; charset=ISO-8859-1",
-      "text/css; charset: UTF-8",
-      "text/html;charset=latin1",
-      "text/html;charset=windows-1256",
-      "text/html;ISO-8859-1; charset=ISO-8859-1",
-      "text/html; charset=KOI8-R",
-      "text/vnd.wap.wml",
-      "application/octect-stream",
-      "application/download",
-      "text/plain; charset=iso8859-1",
-      "text/html; charset=Shift-JIS",
-      "text/html; charset=Gb2312",
-      "text/x-diff",
-      "application/x-msword-doc",
-      "audio/x-ms-asf",
-      "text/css; charset=ISO-8859-1",
-      "text/vnd.wap.wml; charset=utf-8",
-      "application/mspowerpoint",
-      "text/html; charset=euckr",
-      "text/x-csrc",
-      "text/html; charset=WINDOWS-1254",
-      "text/html; charset= iso-8859-1",
-      "text/html;charset=US-ASCII",
-      "video/x-m4v",
-      "text/xml;charset=GBK",
-      "text/html; charset=EUC",
-      "text/xml; Charset=UTF-8",
-      "text/html; charset=windows-1253",
-      "text/html; charset=windows",
-      "text/x-tex",
-      "text/html; charset=koi8-u",
-      "text/html; Charset=ISO-8859-9",
-      "text/javascript;charset=iso-8859-1",
-      "application/unknown",
-      "application/x-java-jnlp-file",
-      "chemical/x-mopac-input",
-      "application/x-nwc",
-      "text/html; charset=iso8859_1",
-      "text/html;charset=UTF8",
-      "text/xml; charset=windows-1252",
-      "text/html; charset=gb18030",
-      "text/html; charset=is0-8859-1",
-      "text/html;charset=ISO-8859-1; charset=iso-8859-1",
-      "text/html; charset=GB-2312",
-      "application/x-shockwave-flash2-preview",
-      "text/xml;",
-      "application/xhtml+xml; charset=iso-8859-15",
-      "video/x-ms-asx",
-      "text/html; Charset=WINDOWS-1252",
-      "text/html; charset=ISO-8859-7, greek",
-      "video/mpeg",
-      "text/html; charset=zh-cn",
-      "text/html; META_CONTENT; charset=iso-8859-1",
-      "text/html; Charset=1250",
-      "text/html; charset iso-8859-1",
-      "application/x-quicktimeplayer",
-      "audio/x-m4a",
-      "image/vnd.djvu",
-      "text/html;charset=windows-1250",
-      "application/x-sh",
-      "text/x-vCalendar; charset=iso-8859-15",
-      "text/html; Charset=ISO8859-1",
-      "text/calendar; charset=iso-8859-15",
-      "text/html; charset=ISO8859-15",
-      "application/x-msi",
-      "text/html; charset=auto",
-      "video/3gpp",
-      "text/html; charset=NONE",
-      "image/pjpeg;charset=ISO-8859-1",
-      "text/html; Charset=utf-8;charset=utf8",
-      "text/html; charset=WINDOWS-1255",
-      "text/html;; charset=ISO-8859-1",
-      "text/html;charset=Windows-1252",
-      "application/rss+xml;charset=utf-8",
-      "text/html; Charset=windows-874",
-      "application/pdf; charset=ISO-8859-1",
-      "text/html; charset= UTF-8",
-      "image/JPG",
-      "text/html; Charset=euc-kr",
-      "text/html; Charset=x-sjis",
-      "text/html;charset=Cp1250",
-      "text/html;charset=ISO-8859-2",
-      "text/html; charset=ISO",
-      "text/html;charset=iso-8859-1;",
-      "image/vnd",
-      "text/html; Charset=UTF8",
-      "text/css;charset=utf-8",
-      "text/html; charset=fr_FR.ISO8859-1",
-      "text/x-c",
-      "application/x-rar",
-      "text/html; charset=WIN-1251",
-      "text/html; charset=8859-1",
-      "text/html; charset=uft-8",
-      "text/html; charset=Cp943C",
-      "application/x-download",
-      "text/html; Charset=windows-1255",
-      "text/html; charset=EUC_KR",
-      "application/x-wais-source",
-      "image/PNG",
-      "text/javascript; charset=UTF-8",
-      "application/atom+xml;charset=UTF-8",
-      "application/mathematica",
-      "text/x-python",
-      "text/html; iso-8859-1",
-      "application/msword; charset=ISO-8859-1",
-      "text/html; Charset=big5",
-      "text/html; UTF-8; Charset=UTF-8",
-      "image/x-png",
-      "text/html;; charset=UTF-8",
-      "text/html;charset=Windows-1251",
-      "text/html; charset=ENCODING",
-      "text/html; charset=LATIN1",
-      "text/plain;",
-      "text/html; charset=EUCKR",
-      "text/x-perl",
-      "application/pdf;charset=ISO-8859-1",
-      "text/html; Charset=1255",
-      "text/html; Charset=windows-1250",
-      "text/html; charset=iso-5589-15",
-      "text/html;; charset=windows-1251",
-      "text/plain; charset=ISO-8859-15",
-      "application/xhtml+xml; charset=iso-8859-2",
-      "application/x-latex",
-      "text/calendar; charset=utf-8",
-      "application/JavaScript",
-      "text/html; charset=tis620",
-      "application/x-netcdf",
-      "image/Jpeg",
-      "text/vnd.sun.j2me.app-descriptor",
-      ".jpg",
-      "text/vnd.abc",
-      "application/pdf; charset=utf-8",
-      "image/png; charset=ISO-8859-1",
-      "text/html; Charset=GBK",
-      "text/html; charset=it",
-      "text/html; profile=xhtml;charset=ISO-8859-1",
-      "text/xml; charset=windows-1254",
-      "text/html; charset=ISO-8859-5-i",
-      "text/html; charset=Win-1251",
-      "text/XML",
-      "text/html; charset=UTF-8; charset=UTF-8",
-      "application/x-zip-compressed",
-      "text/x-vcard; charset=UTF-8",
-      "text/xml;charset=windows-1251",
-      "application/vnd.oasis.opendocument.text",
-      "application/x-javascript; charset=UTF-8",
-      "text/html; charset=Shift_JI",
-      "text/html; charset=iso-8859",
-      "application/vnd.sun.xml.writer",
-      "image/gif; name=image.gif",
-      "text/html; charset=CP1254",
-      "text/html; charset=Utf-8",
-      "text/html; charset=win-1250",
-      "application/x-msdownload",
-      "text/html;charset=windows-1255",
-      "image/gif; name=c_image.gif",
-      "text/html; charset=fr_FR",
-      "Image/BMP",
-      "application/tabledit",
-      "text/html; charset UTF-8",
-      "text/html; charset=IS0-8859-1",
-      "text/x-java-source",
-      "text/html; charset=window-1251",
-      "application/xml; charset=ISO-8859-1; filename=feed.xml",
-      "application/xhtml+xml; charset=EUC-JP",
-      "text/html; charset=X-MAC-ROMAN",
-      "$ext",
-      "application/x-mspublisher",
-      "text.html",
-      "text/html; charset=es_ES.ISO-8859-1",
-      "application/javascript",
-      "text/html; charset=ANSI",
-      "text/html; charset=MS949",
-      "application/xhtml+xml;charset=shift_jis",
-      "text/html; charset=en_GB",
-      "application/octet-stream; charset=ISO-8859-1",
-      "application/x-intkey",
-      "application/x-java-archive",
-      "text/x-bibtex",
-      "application/msword; charset=iso-8859-15",
-      "application/xml; charset=windows-1251",
-      "image/GIF",
-      "text/css; charset=windows-1252",
-      "text/html; charset=iso-8859-9'",
-      "text/html;charset=ISO-8859-5",
-      "text/javascript;charset=UTF-8",
-      "text/html; charset=iso-8859-8-i",
-      "text/vbscript",
-      "text/html; charset='GBK'",
-      "application/xml-dtd",
-      "audio/x-mp3",
-      "text/html; Charset=utf-8;charset=utf-8",
-      "text/html; charset=iso-8859-8",
-      "text/css; charset=UTF-8",
-      "text/html; charset=de_CH.UTF-8",
-      "text/html; charset=x-MS950-HKSCS",
-      "x-world/x-vrml",
-      "image/JPEG",
-      "application/vnd.ms-asf",
-      "text/plain; charset=WINDOWS-1251",
-      "application/x-javascript; charset=iso-8859-1",
-      "text/html; charset: UTF-8; charset=utf-8",
-      "application/x-httpd-php5",
-      "text/html; charset=cp1252",
-      "text/html; charset=ISO-8859-15;charset=ISO-8859-1",
-      "application/atom+xml;charset=utf-8",
-      "application/x-msdos-program",
-      "application/xhtml+xml; charset=ISO-8859-1",
-      "text/html; Charset=-8",
-      "text/html; Charset=Shift_JIS",
-      "text/html; charset=utf-8; encoding=utf-8",
-      "application/pdf; charset=iso-8859-15",
-      "application/x-cdlink",
-      "image/pdf",
-      "text/html; charset=.win-1251",
-      "text/html; charset=iso-8851-1",
-      "application/vnd.oasis.opendocument.presentation",
-      "audio/x-mpeg, audio/x-mpeg-3, audio/mpeg3",
-      "text/xml; charset=ISO-8859-15",
-      "application/ti",
-      "text/html; CHARSET=Shift_JIS",
-      "text/html;charset=BIG5",
-      "application/rdf+xml; name=shop.xml",
-      "application/vcard",
-      "application/rss+xml;charset=iso-8859-1",
-      "application/x-vmarc",
-      "text/html; charset=iso8859-9",
-      "text/html;charset=windows-1254",
-      "audio/midi",
-      "image/png;charset=UTF-8",
-      "text/html; charset=Windows-31j",
-      "text/html; charset=utf",
-      "text/xml; charset=windows-1250",
-      "text/xml; charset=windows-1256",
-      "text/html/srt",
-      "text/html; charset= utf-8",
-      "text/html; charset=iso-8859-15;",
-      "text/html; charset=iso-gb2312",
-      "text/xml; charset='ISO-8859-1'",
-      "application/x-director",
-      "audio/x-mpegurl.m3u",
-      "image/x-xbitmap",
-      "text/html; charset=GB3212",
-      "Text/XML; charset=utf-8",
-      "text/bib",
-      "text/html; Charset=ISO-LATIN-1",
-      "text/html; charset: ISO-8859-1; charset=UTF-8",
-      "text/html; charset=Big-5",
-      "text/html; charset=X-SJIS",
-      "text/html; charset=wc_charset",
-      "text/xml;  charset=utf-8",
-      "application/asx",
-      "application/vnd.ms-word",
-      "text/html; charset=.iso8859-1",
-      "application/cgi",
-      "text/html; charset='utf-8'",
-      "text/html; charset=IS0-8859-8",
-      "text/html; charset=cp1241",
-      "text/plain ; charset=UTF-8",
-      "text/x-sh",
-      "application/x-graphing-calculator",
-      "application/x-perl",
-      "application/xhtml+xml;charset=ISO-8859-15",
-      "text/html; level=1",
-      "application/metalink+xml; charset=UTF-8",
-      "octet/stream",
-      "text/x-vCalendar",
-      "x-application/pdf",
-      "application/rss+xml;",
-      "x-httpd-php",
-      "application/opensearchdescription+xml; charset=utf-8",
-      "application/rss+xml; charset=UTF-8;",
-      "image/png; charset=iso-8859-15",
-      "image/svg+xml; qs=0.85",
-      "text/html; charset=iso-8859-5",
-      "text/html; charset=win",
-      "application/word-doc",
-      "application/xml;",
-      "text/css; charset=iso-8859-15",
-      "text/html; charset=ISO-8859-11",
-      "text/html; charset=window-1256",
-      "text/html;accept-charset=Shift_JIS",
-      "text/html;iso-8859-15;charset=iso-8859-15",
-      "text/vnd.wap.wml;",
-      "application/ms-powerpoint",
-      "application/xml; charset=iso-8859-9",
-      "message/news",
-      "text/html;image/gif;image/jpeg; Charset=iso-8859-1;text/javascript",
-      "text/xml; Charset=iso-8859-1",
-      "application/prs.plucker",
-      "image",
-      "text/HTML; Charset=ISO-8859-1",
-      "text/html;charset=EUC-JP;",
-      "text/plain; charset=EUC-KR",
-      ".gif",
-      "application/x-javascript;charset=utf-8",
-      "text/css;charset=ISO-8859-1",
-      "text/html; charset: iso-8859-15; charset=ISO-8859-1",
-      "text/plain; charset=iso-8859-15",
-      "application/msword;charset=UTF-8",
-      "application/xhtml+xml; Charset=iso-8859-1",
-      "text/html; charset=ISO-8859-10",
-      "application/x-dzip",
-      "chemical/x-mdl-molfile",
-      "text/html; charset=WINDOWS-874",
-      "text/javascript; charset=windows-1252",
-      "application/rdf+xml; qs=0.9",
-      "application/rss+xml; charset='UTF-8'",
-      "text/html; charset='UTF-8'",
-      "video/x-msvideo",
-      "application/x-bzip",
-      "text/html;  charset=UTF-8",
-      "text/html; Charset=utf-8; charset=UTF8",
-      "text/html; charset=CONF_CHARSET",
-      "text/html; charset=ISO-9001",
-      "text/html; charset=zh-TW",
-      "application/vnd.sun.xml.impress",
-      "application/xml;charset=iso-8859-1",
-      "image/jp2",
-      "text/html; charset=UTF=-8",
-      "text/html; charset=no",
-      "text/xml; charset=EUC-JP",
-      "text/xml;charset=cp1251",
-      "www/unknown",
-      "text/html; ISO-8859-1",
-      "text/html; charset=en_US.UTF-8",
-      "text/html;Charset=Windows-1253",
-      "application/x-pilot",
-      "chemical/x-chemdraw",
-      "text/html; charset=UTF-8; charset=iso-8859-1",
-      "text/xml; charset='iso-8859-1'",
-      "application/x-maker",
-      "application/xhtml+xml;charset=ISO-8859-1",
-      "image/gif; charset=iso-8859-15",
-      "text/css; charset=iso-8859-1",
-      "text/html; charset=iso-5589-1",
-      "application/x-zip",
-      "text/html; Charset=65001",
-      "text/html; charset=GB",
-      "text/html; charset=UTF-8;Cache-Control: no-cache",
-      "text/html; charset=Windows-1254",
-      "text/html;charset=koi8-r",
-      "text/plain;charset=ISO-8859-1",
-      "text/x-chdr",
-      "application/x-install",
-      "image/vnd.dwg",
-      "text/html; charset=$yycharset",
-      "text/html; charset=UTF-8; encoding=UTF-8",
-      "text/html; charset=gbk,big5",
-      "application/binary",
-      "audio/x-wav",
-      "image/tiff",
-      "multipart/form-data",
-      "text/html; charset=cp866",
-      "text/html; windows-1252",
-      "text/xml; charset=",
-      "video/unknown",
-      "application/wordperfect",
-      "text/html; Charset=iso-ir-6",
-      "text/html; charset=x-user-defined",
-      "text/html; charset= windows-1251",
-      "text/html; charset=NF_Z_62-010",
-      "text/plain; charset=ISO-8859-9",
-      "video/x-ms-wmx",
-      "text/calendar; charset=utf8",
-      "text/html; Charset=Windows-1254",
-      "text/html; charset=ISO8859-9",
-      "text/html;charset=ISO-8859-9",
-      "application/java-vm",
-      "application/pdf; charset=us-ascii",
-      "audio/x-ptb",
-      "text/html; charset=SO-8859-1",
-      "x-mapp-php4",
-      "application/vnd.google-earth.kml+xml kml",
-      "application/xhtml+xml;",
-      "image/spr",
-      "text/xml; Charset=ISO-8859-1",
-      "application/msword; charset=iso-8859-1",
-      "application/x-shar",
-      "text/html; Charset=-1254",
-      "text/html; Charset=text/html; charset=Windows-1254",
-      "text/rdf+n3; qs=0.89",
-      "text/x-registry",
-      "text/xml; charset: iso-8859-1;charset=utf-8",
-      "application/rss+xml; disposition-type=text",
-      "application/vnd.oasis.opendocument.spreadsheet",
-      "application/xml; charset=windows-1256",
-      "text/HTML; charset=utf-8",
-      "text/html; charset=ISO-8859-6",
-      "text/html; charset=ISO8859_15",
-      "text/html; charset=SIFT-JIS",
-      "text/html; charset=cp1250",
-      "text/html; lang='ja' charset=utf-8",
-      "text/javascript;charset=utf-8",
-      "text/plain; charset=windows-1252",
-      "video/x-ms-asf; charset=UTF-8",
-      "application/msstreets",
-      "application/x-tcl",
-      "application/xml;charset=ISO-8859-1",
-      "text/html; charset=RTF-8",
-      "text/plain;; charset=iso-8859-1",
-      "Application/msword",
-      "application/vnd.dpgraph",
-      "application/x-troff-ms",
-      "text/html; charset=Shift-jis",
-      "text/html; charset=utf-8; charset=utf-8; charset=utf-8",
-      "text/html;charset=UTF-8;",
-      "text/vnd.wap.wml;charset=UTF-8",
-      "text/xml; charset=utf8",
-      "binary/octet-stream",
-      "text/css;charset=iso-8859-1",
-      "text/html; charset=GB2321",
-      "text/html;charset=iso-8859-7",
-      "application/rsd+xml;charset=utf-8",
-      "application/rss+xml; charset: utf-8",
-      "application/x-x509-cert",
-      "text/html; CHARSET=Windows-1250",
-      "text/html; Charset=ISO8859-9",
-      "text/html; charset: utf-8;; charset=utf-8",
-      "text/html; charset=euc",
-      "text/html; charset=shift_jis; charset=Shift_JIS",
-      "text/xml; Charset=windows-1252",
-      "text/xml;charset=EUC-JP",
-      "xml/otet",
-      "application/TEXT",
-      "application/rsd",
-      "drawing/x-dwf",
-      "text/html; charset=cp-1252",
-      "text/html;CHARSET=utf-8",
-      "application/msword; charset=UTF-8",
-      "text/html; charset='shift-jis'",
-      "text/html; charset=ISO-IR-111",
-      "text/html; charset=es_ES.UTF8",
-      "text/html; charset=ja",
-      "text/xml; charset=GB2312",
-      "TEXT/CSS",
-      "application/rss+xml; charset=windows-1251",
-      "application/x-msword",
-      "application/x-wp",
-      "application/x-x509-ca-cert",
-      "application/xml;charset=windows-1256",
-      "audio/x-pd",
-      "text/HTML; charset=UTF-8",
-      "text/html; Charset=windows-1253",
-      "text/html;CHARSET=iso8859-1",
-      "text/html;charset-UTF-8",
-      "text/html;charset=cp1251",
-      "text/javascript;charset=ISO-8859-1",
-      "text/plain; charset=koi8-r",
-      "text/x-c++src",
-      "text/x-sql",
-      "text/xml; charset=UTF-8; charset=UTF-8",
-      "text/xml; charset=iso-8859-9",
-      ".png",
-      "application/maple",
-      "audio/mpg",
-      "image/pcx",
-      "text/html; Charset=ISO-LATIN-7",
-      "text/html; charset=x-mac-cyrillic",
-      "text/xml;charset=iso-8859-9",
-      "Application/x-research-info-systems",
-      "TEXT/HTML",
-      "application/kml+xml",
-      "application/octetstream",
-      "application/smil+xml",
-      "application/x-javascript; charset=ISO-8859-1",
-      "application/x-sysquake",
-      "image/jpg; charset=utf-8",
-      "image/x-portable-pixmap",
-      "text/calendar; charset=UTF-8",
-      "text/html;  charset=utf-8;",
-      "text/html; CHARSET=utf-8",
-      "text/html; Charset=iso-8859-15",
-      "text/html; charset=ISO88591",
-      "text/html; charset=\'$CHARSET\'",
-      "text/html; charset=term",
-      "text/plain;charset=utf-8",
-      "application/json",
-      "application/octet-stream; charset=iso-8859-15",
-      "application/prc",
-      "application/vnd.symbian.install",
-      "text/html; charset=ANSI_X3.4-1968",
-      "text/x-log",
-      "video/x-ms-asf; charset=utf-8",
-      "application/mp_arc-mixed",
-      "application/rss+xml;charset=UTF-8",
-      "application/x-asap",
-      "application/xhtml+xml;charset: UTF-8",
-      "application/xml; qs=0.9",
-      "audio/x-ms-asx",
-      "text/html; charset=.latin1",
-      "text/html; charset=Default",
-      "text/html; charset=TIS620",
-      "text/html; chaset=euc-jp; charset=euc-jp",
-      "text/html;charset=ISO-8859-1;charset=ISO-8859-1",
-      "application/x-httpd.php",
-      "application/x-javascript;charset=ISO-8859-1",
-      "application/xml; charset=windows-1250",
-      "application/xspf+xml; charset=utf-8",
-      "image/gif; charset=EUC-JP;",
-      "Image/gif",
-      "application/cadstd",
-      "application/pdf;charset=utf-8",
-      "application/x-forcedownload",
-      "application/xml; charset='utf-8'",
-      "text/html; Charset=Windows-1255",
-      "text/html; Charset=shift_jis",
-      "text/html; charset='windows-1252'",
-      "text/html; charset=8859-15",
-      "text/html; charset=Tis-620",
-      "text/html; charset=UTF-None",
-      "text/html; charset=x-euc-jp",
-      "text/html;charset=iso8859-1",
-      "text/html;charset=windows-1257",
-      "text/langfile",
-      "text/plain; charset=none",
-      "application/lotus",
-      "application/rss+xml; charset: UTF-8",
-      "application/x-dreamcast-vms-info",
-      "application/x-life",
-      "application/xhtml+xml; charset='iso-8859-1'",
-      "application/xhtml+xml;charset=windows-1251",
-      "image/gif; charset=utf-8",
-      "text/calendar;charset=ISO-8859-1",
-      "text/html; charset=ISO-2022-KR",
-      "text/html; charset=KOI8-r",
-      "text/html; charset=iso-utf-8",
-      "text/html;charset=GB18030",
-      "text/xml;charset=ISO-8859-15",
-      "application/applefile",
-      "application/atom",
-      "application/vnd.musician",
-      "application/x-xfig",
-      "pdf",
-      "text/html; charset=ISO-0059-1",
-      "text/html; charset=ISO-8859-1, latin1",
-      "text/html; charset=windwos-1256",
-      "text/html; iso-8859-2;charset=ISO-8859-2",
-      "txt",
-      "application/x-amstex",
-      "application/x-smaf",
-      "application/xhtml+xml;;charset=utf-8",
-      "application/xml;charset=windows-1252",
-      "text/html; charset=_CHARSET",
-      "text/html; charset=iso-8895-1",
-      "text/html;charset=windows-1258",
-      "text/rdf",
-      "Image/Gif",
-      "Text/Html",
-      "Text/html; charset=koi8-u",
-      "application/rss+xml; charset='utf-8';",
-      "application/x-csh",
-      "application/x-endnote-refer",
-      "application/xml; charset=ISO-8859-2",
-      "application/xspf+xml",
-      "image/gif expires: mon, 01 jan 1990 00:00:00 gmt",
-      "image/pk3",
-      "text/HTML; charset=windows-1254; Charset=windows-1254",
-      "text/css; charset: UTF-8;charset=UTF-8",
-      "text/directory",
-      "text/html; charset=ISO-8859-16",
-      "text/html; charset=UTF-7",
-      "text/html; charset=euc-kr; Charset=euc-kr",
-      "text/html;;charset=Cp943C",
-      "text/xml; charset='windows-1251'",
-      "text/xml; charset=ISO-8859-9",
-      "application/x-executable",
-      "application/x-trash",
-      "audio/x-mpegurl; charset=utf-8",
-      "image/x-pict",
-      "text/HTML; charset=ISO-8859-1",
-      "text/css; Charset=UTF-8",
-      "text/html; charset='windows-1252'",
-      "text/html; charset=DE",
-      "text/html; charset=ISO-8859-1; Last-Modified: $modifieddate",
-      "text/html; charset=u",
-      "text/html; charset=urf-8",
-      "text/html; charset=utf8_czech_cs",
-      "text/html;; charset=utf-8",
-      "text/javascript; Charset=UTF-8",
-      "text/plain; charset=euc-kr",
-      "text/vcard;charset=iso-8859-1",
-      "text/xml; charset=Windows-1254",
-      "unknown",
-      "application/atom+xml; charset=UTF-8;",
-      "application/octet-stream;charset=UTF-8",
-      "application/save",
-      "application/x.atom+xml; charset=utf-8",
-      "application/xml; Charset=ISO-8859-1",
-      "text/html; charset='windows-1256'",
-      "text/html; charset=BIG-5",
-      "text/html; charset=IS0-8859-15",
-      "text/html;charset=utf",
-      "text/richtext",
-      "text/rss",
-      "text/tab-separated-values",
-      "text/x-hamlet-action",
-      "text/xml;  charset=utf-8;",
-      "text/xml;charset=gbk",
-      "application/atom+xml; charset=iso-8859-9",
-      "application/vnd.google-earth.kmz kmz",
-      "application/x-troff-man",
-      "application/xls",
-      "chemical/x-mdl-tgf",
-      "text/html; CHARSET=UTF-8; charset=UTF-8",
-      "text/html; Charset=iso-8859-2",
-      "text/html; charset=euc-jp;",
-      "text/html;Charset=iso-8859-1",
-      "text/html;charSet=EUC-JP",
-      "text/html;charset:UTF-8",
-      "text/html;charset=ISO8859-1",
-      "text/javascript; charset=ISO-8859-1",
-      "text/tab-separated-values; charset=utf-8",
-      "application/atom+xml; charset='UTF-8'",
-      "application/atom+xml; charset=windows-1251",
-      "application/xhtml+xml; Charset=utf-8",
-      "application/xml; CHARSET=UTF-8",
-      "text/html; charset=BG2312",
-      "text/html; charset=EUC-jp",
-      "text/html; charset=gb2312,big5",
-      "text/html; charset=utf-8; Cache-Control: public",
-      "text/html;charset=x-sjis",
-      "text/xml, application/xml; charset=ISO-8859-1",
-      "video/mp4;charset=ISO-8859-1",
-      "video/x-mp4",
-      "application/finale",
-      "application/octet_stream",
-      "application/pdf;",
-      "application/x-7z-compressed",
-      "audio/reason",
-      "audio/unknown",
-      "image/vnd.dxf",
-      "text/HTML; Charset=gb2312",
-      "text/html; charset='csISOLatinHebrew'",
-      "text/html; charset=ZHS16GBK",
-      "text/html;CHARSET=iso-8859-1",
-      "text/html;CHARSET=x-sjis",
-      "text/sgml",
-      "text/xml; charset=ISO-8859-2",
-      "text/xml; charset=iso-8859-2",
-      "Application/x-shockwave-flash",
-      "application/unkown",
-      "application/vnd.mozilla.xul+xml",
-      "application/x-doc",
-      "application/x-iso9660-image",
-      "application/x-research-info-systems",
-      "audio/m3u",
-      "image/Gif",
-      "image/png;charset=ISO-8859-1",
-      "text/html; charset=WIN-1250",
-      "text/plain;charset=iso-8859-1",
-      "APPLICATION/OCTET-STREAM",
-      "application/PDF",
-      "application/acrobat",
-      "application/msword;charset=ISO-8859-1",
-      "application/octet-stream; charset=UTF-8",
-      "application/perl",
-      "application/{$sAppType}",
-      "attachment/pdf",
-      "image/x-icon",
-      "text/HTML;",
-      "text/html; Charset=us-ascii",
-      "text/html; Charset=windows-1037",
-      "text/html; charSet=gb2312;charset=ISO-8859-1",
-      "text/html; charset=S-JIS",
-      "text/html; charset=Western-8859-1",
-      "text/html; charset=Windows-874",
-      "text/html;charset=windows1256",
-      "text/plain; charset=TIS-620",
-      "text/plain; charset=cp1251",
-      "text;",
-      "video/x-ms-asx;charset=ISO-8859-1",
-      "1",
-      "Text/html",
-      "application/pff",
-      "application/text charset=utf-8",
-      "application/vnd.wordperfect",
-      "application/x-arachne-package",
-      "application/x-cdf; charset=utf-8",
-      "application/xml; Charset=GB2312",
-      "audio/basic",
-      "image/x-coreldraw",
-      "text/html; Charset=Shift-JIS",
-      "text/html; Charset=Shift_JIS1252",
-      "text/html; charset=big-5",
-      "text/html; charset=default",
-      "text/html; charset=en-us",
-      "text/html; charset=koi8u",
-      "text/html; charset=text",
-      "text/html; charset=windows-1256;",
-      "text/html;ISO-8859-1; charset=iso-8859-1",
-      "text/plain; charset=iso8859-15",
-      "text/plain; charset=us-ascii",
-      "text/plain;; charset=utf-8",
-      "text/rtf; charset=koi8-r",
-      "text/vnd.wap.wml; Charset=UTF-8",
-      "text/xml; Charset=windows-1254",
-      "application/atom+xml; Charset: iso-8859-1",
-      "application/opensearchdescription+xml;charset=utf-8",
-      "application/pdf;charset=application/pdf",
-      "application/pgp-keys",
-      "application/rss+xml; charset=iso-8859-9",
-      "application/vnd.wap.xhtml+xml",
-      "application/x-server-parsed-html",
-      "application/x-stuffit",
-      "application/xml; charset=iso-8859-15",
-      "text/html; Charset=BIG5",
-      "text/html; charset=ISO-8859-1UTF-8",
-      "text/html; charset=es",
-      "text/html; charset=ko_KR",
-      "text/html; charset=uft8",
-      "text/html;charset=Shift_jis",
-      "text/plain; charset=shift_jis",
-      "text/x-vcard; charset=UTF-8 name=contact.vcf",
-      "text/xml;charset=US-ASCII",
-      "application/vnd.adobe.air-application-installer-package+zip",
-      "application/vnd.openxmlformats",
-      "application/x-asp",
-      "application/x-autocad",
-      "application/x-mscardfile",
-      "application/xhtml+xml; charset=US-ASCII",
-      "audio-x/mpegurl",
-      "image/autocad",
-      "image/gif;charset=ISO-8859-1",
-      "image/png; charset=utf-8",
-      "model/iges",
-      "reader/x-lit",
-      "text/html; CHARSET=ISO-8859-1",
-      "text/html; Charset=1256",
-      "text/html; Charset=iso-8859-1;charset=iso-8859-1",
-      "text/html; charset: iso-8859-1",
-      "text/html; charset=CP1250",
-      "text/html; charset=UTF-8; Charset=utf-8",
-      "text/html; charset=euc-Kr",
-      "text/html; charset=nl",
-      "text/html; iso-8859-2;charset=iso-8859-2",
-      "text/html;charset='iso-8859-1'",
-      "text/plain; charset='utf-8'",
-      "text/plain; charset=GBK",
-      "text/plain; charset=None",
-      "text/plain; charset=euc-jp",
-      "text/rss;charset=UTF-8",
-      "text/rtf; charset=windows-1251",
-      "text/x-fortran",
-      "text/xml; charset=latin1",
-      "application",
-      "application/fml",
-      "application/powerpoint",
-      "application/rss+xml; charset='utf-8'",
-      "application/vnd.sun.xml.calc",
-      "application/x-mpeg4",
-      "application/xhtml+xml; charset=shift_jis",
-      "image/Gif; charset=utf-8",
-      "text/abc.vnd",
-      "text/html; charset='GBK'",
-      "text/html; charset=UFT-8",
-      "text/html; charset=iso-8859-1; Charset=ISO-8859-1",
-      "text/html;charset=MS949",
-      "text/html;charset=windows-31J",
-      "text/rdf+n3",
-      "text/x-vCalendar; charset=utf-8",
-      "text/xml;;charset=iso-8859-1",
-      "video/m4v",
-      "; charset=utf-8",
-      "application/pdf; Charset=UTF-8",
-      "application/rss+xml; charset=windows-1250",
-      "application/x-chat",
-      "application/x-ip",
-      "application/x-koan",
-      "application/xml; charset='ISO-8859-1'",
-      "application/xml; disposition-type=text",
-      "audio/mp4a-latm",
-      "multipart/x-mixed-replace;boundary=End",
-      "text/css;",
-      "text/css; charset=euc-jp",
-      "text/css;charset=UTF-8",
-      "text/html; Charset=Windows-1256",
-      "text/html; charset=All",
-      "text/html; charset=IOS-8559-1",
-      "text/html; charset=ISO_8859-1:1987",
-      "text/html; charset=greek",
-      "text/html; charset=on|UTF-8",
-      "text/html; charset=zh_CN.UTF-8",
-      "text/html;charset=Shift-JIS",
-      "text/html;charset=Windows-1256",
-      "text/html;charset=ms949",
-      "text/json",
-      "text/texmacs",
-      "text/x-pascal",
-      "text/xml; Charset: iso-8859-1",
-      "text/xml; Charset=iso-8859-9",
-      "text/xml; charset=US-ASCII",
-      "video/x-ms-asf-plugin",
-      "application/cap",
-      "application/kml",
-      "application/ms-word",
-      "application/vnd.palm",
-      "application/x-imagemap",
-      "application/x-javascript; Charset=utf-8",
-      "audio/m4a",
-      "audio/x-m3u",
-      "audio/x-ms-wma",
-      "image/jpeg;charset=UTF-8",
-      "text/html; Charset=,",
-      "text/html; charset:ISO-8859-1;",
-      "text/html; charset=GB18030",
-      "text/html; charset=LANG_CHARSET",
-      "text/html; charset=win-1256",
-      "text/html; charset=win1250",
-      "text/html; encoding: windows-1255",
-      "text/html;;charset=ISO-8859-1",
-      "text/html;charset=KSC5601",
-      "text/html;charset=iso8859-2",
-      "text/js",
-      "text/plain; charset=en_US",
-      "text/plain; charset=gbk",
-      "text/x-dsrc",
-      "text/xml; charset=koi8-r",
-      "application/pdf",
-      "application/pdf; charset=iso-8859-7",
-      "application/pdf; qs=0.001",
-      "application/pls+xml",
-      "application/riscos",
-      "application/x-redhat-package-manager",
-      "application/x-shellscript",
-      "application/x-windows-gadget",
-      "application/xhtml+xml; UTF-8",
-      "audio/mp3",
-      "image/gif; charset=UTF-8;",
-      "image/jpeg,image/pjpeg",
-      "image/x-rgb",
-      "image/x.djvu",
-      "text/html;  charset=windows-874",
-      "text/html; Charset=1254",
-      "text/html; Charset=EUC-KR",
-      "text/html; Charset=ISO-8859-2",
-      "text/html; Charset=KOI8-R",
-      "text/html; Charset=KOREAN",
-      "text/html; UTF-8",
-      "text/html; charset: utf-8;charset=utf-8",
-      "text/html; charset=646",
-      "text/html; charset=Shift_JIS;",
-      "text/html; charset=Shift_Jis",
-      "text/html; charset=WINDOWS-1253",
-      "text/html; charset=big5-HKSCS",
-      "text/html; charset=fr_FR.ISO-8859-15@euro",
-      "text/html; charset=gb2312_chinese_ci",
-      "text/html;Charset=Shift_JIS",
-      "text/html;charset=UTF-8;Cache-control: no-cache;Pragma: no-cache;Expires: Fri, 30 Oct 1998 14:19:41 GMT",
-      "text/html;charset=utf-8; charset=UTF-8",
-      "text/javascript; charset=iso-8859-1",
-      "text/plain; charset=EUC-JP",
-      "text/troff",
-      "text/x-c++hdr",
-      "text/x-config",
-      "text/x-suse-ymp",
-      "text/x-vcalendar",
-      "video/x-ms-af",
-      "application/octet-stream",
-      "IMAGE/JPEG",
-      "application/exe",
-      "application/keyhole",
-      "application/labview.app",
-      "application/octet-stream; charset=iso-8859-1",
-      "application/pdf;charset=iso-8859-1",
-      "application/rss+xml; Charset=utf-8",
-      "application/rss+xml; revision=2.0",
-      "application/vnd.groove-vcard",
-      "application/x-httpd-php-source",
-      "application/x-ms-wmd",
-      "application/x-octetstream",
-      "application/x-opera-configuration-menu",
-      "application/x-texinfo",
-      "application/xml; charset = UTF-8",
-      "application/xslt+xml",
-      "image/jpeg; charset=UTF-8",
-      "plugin/x-theorist",
-      "text/html; Charset=EUC-JP",
-      "text/html; charset=ISO-8859-13",
-      "text/html; charset=SO-2022-KR",
-      "text/html; charset=gb-2312",
-      "text/html; charset=ibm866",
-      "text/html;ISO-8859-1; charset=Windows-1252",
-      "text/html;charset:Shift-JIS",
-      "text/html;charset=eucJp-open",
-      "text/html;charset=windows-874",
-      "text/javascript;",
-      "text/vnd.wap.wml; charset=iso-8859-1",
-      "text/x-card",
-      "text/x-ical",
-      "text/x-opml",
-      "text/xml;charset=iso-8859-15",
-      "video/x-unknown",
-      "; charset=",
-      "application/atom+xml; charset=ISO-8859-2",
-      "application/atom+xml; charset=windows-1250",
-      "application/garmin-data",
-      "application/pdf;charset=gb2312",
-      "application/rss+xml; charset=ISO-8859-2",
-      "application/vnd.google-earth.kml+xml; charset=UTF-8",
-      "application/vnd.google-earth.kml+xml; charset=utf-8",
-      "application/x-bio",
-      "application/x-dot",
-      "application/x-flac",
-      "application/x-font-ttf",
-      "application/x-opera-configuration-language",
-      "application/x-zmachine",
-      "application/x.atom+xml",
-      "application/xml; charset=iso-8859-2",
-      "audio/x-scpls; charset=iso-8859-1",
-      "file/compress",
-      "image/*",
-      "image/Gif; charset=gb2312",
-      "image/x-dcraw",
-      "model/vnd.dwf",
-      "octet-stream",
-      "text/directory;charset=UTF-8",
-      "text/html; charset = UTF-8",
-      "text/html; charset: EUC-JP",
-      "text/html; charset: utf-8;",
-      "text/html; charset='EUC-JP'",
-      "text/html; charset=ISO-88859-1",
-      "text/html; charset=big5,euc-jp",
-      "text/html; charset=uso-8859-1",
-      "text/html; encoding=EUC-JP",
-      "text/javascript; charset=windows-1251",
-      "text/plain ; charset=iso-8859-1",
-      "text/vnd.wap.wml;charset=utf-8",
-      "text/x-patch",
-      "text/xml;charset=latin1",
-      "video/mp4v-es",
-      ".tif",
-      "/",
-      "application/atom+xml; charset='utf-8'",
-      "application/filemaker",
-      "application/mathematica-package",
-      "application/pdslabel",
-      "application/pps",
-      "application/rdf+xml;charset=utf-8;charset=utf-8",
-      "application/rsd+xml; charset=UTF-8",
-      "application/text",
-      "application/torrent",
-      "application/vnd.sun.xml.draw.",
-      "application/x-blorb",
-      "application/x-hwp",
-      "application/x-incredimail",
-      "application/x-javascript;charset=UTF-8",
-      "application/x-maple",
-      "application/x-quicktime-media-link",
-      "application/x-shockwave-flash; charset=UTF-8",
-      "application/xml; Charset=utf-8",
-      "application/xml; charset= iso-8859-9",
-      "application/xml; charset='iso-8859-1'",
-      "application/xml; charset=ISO-8859-9",
-      "chemical/x-cerius",
-      "chemical/x-molconn-Z",
-      "image/gif; charset=iso-8859-1",
-      "image/ico",
-      "image/jpeg;charset=ISO-8859-1",
-      "image/pjpeg; charset=UTF-8",
-      "text/CSS",
-      "text/HTML; Charset=windows-1254",
-      "text/Javascript; charset: UTF-8",
-      "text/comma-separated-values; charset=UTF-8",
-      "text/css; charset: ISO-8859-1",
-      "text/html; Language=utf-8",
-      "text/html; charset=$charset",
-      "text/html; charset=ISO-8591-15",
-      "text/html; charset=ISO-8851-1",
-      "text/html; charset=ISO-8859-1,UTF-8",
-      "text/html; charset=charset=iso-8859-1",
-      "text/html; charset=hz-gb-2312",
-      "text/html; charset=iso-UTF-8",
-      "text/html; charset=iso-latin-1",
-      "text/html; charset=utf-16",
-      "text/html; charset=window-1252",
-      "text/html; charset=zh_CN.GB18030",
-      "text/html; qs=1",
-      "text/html;charset=Big5-HKSCS",
-      "text/html;charset=MS936",
-      "text/html;charset=gb2312; Charset=GB2312",
-      "text/html;charset=shift_JIS",
-      "text/html;encoding=utf-8",
-      "text/javascript; Charset=utf-8",
-      "text/js; charset=utf-8",
-      "text/vnd.wap.wml;charset=ISO-8859-1",
-      "text/xml; charset:ISO-8859-1",
-      "text/xml; charset=CP1254",
-      "text/xml; charset=Windows-1252",
-      "true-type/font",
-      "video/asx",
-      "video/flc",
-      "video/x-pv-mp4",
-      "x-epoc/x-sisx-app",
-      ".zip",
-      "application/acad; Charset=UTF-8",
-      "application/atomserv+xml",
-      "application/gpx; charset=UTF-8",
-      "application/marc",
-      "application/octet-stream; charset=utf-8",
-      "application/octet-stream; name='image/gif'",
-      "application/text-javascript",
-      "application/unknown15",
-      "application/vnd.ms-word; charset=windows-1252",
-      "application/vnd.ms-works",
-      "application/winhlp",
-      "application/wordperfect5.1",
-      "application/x-httpd-php4",
-      "application/x-jar",
-      "application/x-midi",
-      "application/x-shockwave-flash;charset=UTF-8",
-      "application/x-unknown",
-      "application/xhtml+xml;charset=",
-      "application/xml; charset=ISO-8859-1; filename=rss.xml",
-      "application/xml;Charset=utf-8;",
-      "application/xyz123",
-      "asf",
-      "audio/mpeg3",
-      "audio/quicktime",
-      "image/",
-      "image/x-ms-bmp",
-      "image/x-pcx",
-      "server-parsed",
-      "text/XML; Charset=UTF-8",
-      "text/comma-separated-values",
-      "text/css;  charset=ISO-8859-1",
-      "text/html; Charset=euc-jp",
-      "text/html; charset = iso-8859-1",
-      "text/html; charset= big5",
-      "text/html; charset='koi8-r'",
-      "text/html; charset=ISO-8859-1.",
-      "text/html; charset=Iso-8859-1",
-      "text/html; charset=JIS",
-      "text/html; charset=LATIN-9",
-      "text/html; charset=cp-2151",
-      "text/html; charset=ru_RU.CP1251",
-      "text/html; charset=so-8859-1",
-      "text/html; charset=tw",
-      "text/html;charset=UNICODE-1-1-UTF-8; charset=UTF-8",
-      "text/javascript; charset: UTF-8;charset=UTF-8",
-      "text/plain; charset=ISO-8859-2",
-      "text/plain; charset=Shift_JIS",
-      "text/plain; charset=US-ASCII",
-      "text/x-comma-separated-values",
-      "text/xml; charset: UTF-8",
-      "text/xml; charset= utf-8",
-      "text/xml; charset=WINDOWS-1251",
-      "text/xml;charset=LATIN1",
-      "text/xml;charset=iso-8859-2",
-      "x-mapp-php",
-      "application/atom+xml; charset=ISO-8859-15",
-      "application/atom+xml; charset=latin1",
-      "application/msi",
-      "application/pdf; charset=iso-8859-1;",
-      "application/rss+xml; Charset=UTF-8",
-      "application/rss+xml; charset=ISO-8859-1; filename=rss.xml",
-      "application/rss+xml; charset=utf-8; charset=utf-8",
-      "application/rss+xml; charset=windows-1252",
-      "application/vnd.adobe.apollo-application-installer-package+zip",
-      "application/vnd.ms-project",
-      "application/x-acroread",
-      "application/x-install-instructions",
-      "application/x-ipix",
-      "application/x-kpresenter",
-      "application/x-mplayer2",
-      "application/x-php",
-      "application/x-stuffitx",
-      "application/xhtml+xml; charset=us-ascii",
-      "application/xml; character=utf-8",
-      "application/xml; charset=ISO-8859-1; filename=news.xml",
-      "application/xml; charset=euc-jp",
-      "application/xml; charset=utf-8;",
-      "audio/m4b",
-      "audio/scpls",
-      "audio/x-mpequrl",
-      "audio/x-scpls;charset=UTF-8",
-      "audio/x-twinvq",
-      "image/vnd.nok-oplogo-color",
-      "images/jpeg",
-      "plain/text",
-      "text/htm",
-      "text/html; Charset=Big5",
-      "text/html; Charset=ISO-8859-7",
-      "text/html; Charset=shift-jis",
-      "text/html; UTF-8; charset=UTF-8",
-      "text/html; charset='iso-8859-15'",
-      "text/html; charset='windows-1251'",
-      "text/html; charset=ISO 8859-1",
-      "text/html; charset=ISO-15",
-      "text/html; charset=ISO-8855-1",
-      "text/html; charset=Shift_jis",
-      "text/html; charset=UCS2",
-      "text/html; charset=cp850",
-      "text/html; charset=iso-8859-2;",
-      "text/html; charset=iso_8859-1",
-      "text/html; charset=ks_c_5601",
-      "text/html; charset=latin2-iso-8859-2",
-      "text/html; charset=utf-8; Charset=utf-8",
-      "text/html; encoding=UTF-8",
-      "text/html;;charset=Shift_JIS",
-      "text/html;ISO-8859-1;charset=ISO-8859-1",
-      "text/html;c; charset=iso-8859-1",
-      "text/html;charset=ksc5601",
-      "text/javascript; charset: UTF-8;charset=iso-8859-1",
-      "text/json; charset=utf-8",
-      "text/pdf",
-      "text/plain; charset=cp-1251",
-      "text/plain; charset=windows-1256",
-      "text/x-emacs-lisp",
-      "text/x-versit",
-      "text/xml; charset='ISO-8859-15'",
-      "text/xml;charset=ISO-8859-2",
-      "text/xml;charset=windows-1250",
-      "video/x-ms-wax",
-      "x-type/subtype",
-      ".pdf",
-      "; charset=UTF-8",
-      "TEXT/XML",
-      "application/.pdf",
-      "application/acad",
-      "application/atom+xml; charset=iso-8859-2",
-      "application/atom+xml; charset=utf-8; charset=utf-8",
-      "application/doc",
-      "application/mplayer2",
-      "application/msaccess",
-      "application/plt-scheme-package",
-      "application/rss+xml; Charset=windows-1252",
-      "application/rss+xml; charset=ISO-8859-1; filename=feed1.xml",
-      "application/vnd.google-earth.kml",
-      "application/vnd.ms-htmlhelp",
-      "application/vnd.pdf",
-      "application/x-glulx",
-      "application/x-java",
-      "application/x-makeself",
-      "application/x-ms-reader",
-      "application/x-ms-wmz",
-      "application/x-octet-stream",
-      "application/x-qcshow",
-      "application/x-unknown-content-type-pdbFile",
-      "application/xhtml+xml; qs=0.9",
-      "application/xml; charset=windows-1252; filename=rss-gen.php",
-      "application/xml; qs=0.1",
-      "audio/x-m4b",
-      "audio/x-ms-asx; charset=utf-8",
-      "binary/octec-stream",
-      "image/jpeg;charset=GBK",
-      "image/pak",
-      "image/vnd.djvu; charset=iso-8859-15",
-      "image/vnd.ms-modi",
-      "image/vnd.wap.wbmp",
-      "image/x-djvu",
-      "image/x-urt",
-      "text",
-      "text/XML; charset=utf-8",
-      "text/css; charset=Shift_JIS",
-      "text/css;charset: UTF-8;charset=utf-8",
-      "text/html; Language=gb2312;charset=gb2312",
-      "text/html; Windows-1251",
-      "text/html; Windows-31J;charset=Windows-31J",
-      "text/html; charset: UTF-8; charset=iso-8859-1",
-      "text/html; charset='ISO8859_1'",
-      "text/html; charset=.",
-      "text/html; charset=GB2312.ZH-CN.zh-cn",
-      "text/html; charset=GBK#UTF-8",
-      "text/html; charset=ISO-8859-14",
-      "text/html; charset=ISO-8859-8",
-      "text/html; charset=KOI8-U",
-      "text/html; charset=Shift_JIS; charset=Shift_JIS",
-      "text/html; charset=cp1256",
-      "text/html; charset=iso-8959-1",
-      "text/html; charset=iso-9959-1",
-      "text/html; charset=ptbr-iso-8859-1",
-      "text/html; charset=ujis",
-      "text/html; charset=utf-8; Cache-Control:  no-cache, no-store, must-revalidate, max-age=0, post-check=0,pre-check=0; Pragma: no-cache",
-      "text/html; charset=utf8_decode", "text/html; charset=windows-31J",
-      "text/html;CHARSET=x-euc-jp", "text/html;charset=EUC_CN",
-      "text/html;charset=ks_c_5601-1987",
-      "text/javascript; Charset=windows-1252",
-      "text/plain; charset=ISO-2022-JP", "text/plain; charset=Windows-1251",
-      "text/plain; charset=windows-1254", "text/plain;iso-8859-1", "text/text",
-      "text/x-c; charset=us-ascii", "text/x-hdml; charset=shift_jis",
-      "text/x-python; charset=utf-8", "text/x-scheme", "text/xml GB2312",
-      "text/xml charset=utf-8", "text/xml; charset=Windows-1251",
-      "text/xml; charset=euc-jp", "text/xml; charset=iso-8859-1;",
-      "text/xml; encoding='UTF-8'", "text/xml;charset=WINDOWS-1251",
-      "text/xml;charset=windows-1252", "video/x-fli" };
+    testRecordList.add(new TestRecord(optionalPrefix + "message/news" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "message/rfc822" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "multipart/form-data" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "multipart/x-mixed-replace" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
 
+    testRecordList.add(new TestRecord(optionalPrefix + "plain/text" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "x-application/pdf" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "attachment/pdf" + optionalSuffix,MimeTypeDisposition.ACCEPT_TEXT,overrideDisposition));
+
+    testRecordList.add(new TestRecord(optionalPrefix + "model/iges" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "model/vnd.dwf" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "model/vrml" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "NULL" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "octet-stream" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "octet/stream" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+
+    testRecordList.add(new TestRecord(optionalPrefix + "plugin/x-theorist" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "reader/x-lit" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "server-parsed" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "true-type/font" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "www/unknown" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "x-epoc/x-sisx-app" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "x-type/subtype" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "x-world/x-vrml" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "xml/octet" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "binary/octec-stream" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "binary/octet-stream" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "file/compress" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+
+
+    testRecordList.add(new TestRecord(optionalPrefix + "chemical/x-cerius" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "chemical/x-chemdraw" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "chemical/x-mdl-molfile" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "chemical/x-mdl-tgf" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "chemical/x-molconn-Z" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "chemical/x-mopac-input" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "chemical/x-pdb" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    testRecordList.add(new TestRecord(optionalPrefix + "drawing/x-dwf" + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));    
+  }
+  
+  static void addInvalidExtensions(LinkedList<TestRecord> testRecordList,String optionalPrefix,String optionalSuffix,MimeTypeDisposition overrideDisposition) { 
+    for (String invalidExtension : invalidExtensions) { 
+      testRecordList.add(new TestRecord(optionalPrefix + invalidExtension + optionalSuffix,MimeTypeDisposition.REJECT,overrideDisposition));
+    }
+  }
+  
   public static void main(String[] args) {
-    ContentTypeAndCharset metadata = new ContentTypeAndCharset();
-
-    for (String typeStr : testStrings) {
-
-      NIOHttpHeaders headers = new NIOHttpHeaders();
-
-      headers.add("content-type", typeStr);
-
-      HttpHeaderUtils.parseContentType(headers, metadata);
-
-      if (metadata._contentType != null) {
-        if (checkForExclusion(metadata._contentType))
-          System.out.println("Excluded:" + metadata._contentType + " RAW:"
-              + typeStr);
-        else
-          System.out.println("Passed:" + metadata._contentType + " RAW:"
-              + typeStr + " IsValidTextType:"
-              + isValidTextType(metadata._contentType));
+    
+    LinkedList<TestRecord> testRecords = new LinkedList<TestRecord>();
+    
+    addBinaryTestRecords(testRecords, "", "",null);
+    addValidTextTypeRecords(testRecords, "", "",null);
+    addValidHTMLTypeRecords(testRecords, "", "",null);
+    addOtherValidTextTypeRecords(testRecords, "", "",null);
+    addTestApplicationStrings(testRecords,"", "",null);
+    addAudioTestRecords(testRecords, "", "",null);
+    addImageTestRecords(testRecords, "", "",null);
+    addTestTextRecords(testRecords, "", "",null);
+    addTestVideoRecords(testRecords, "", "",null);
+    addMiscelaneousTestRecords(testRecords, "", "",null);
+    addInvalidExtensions(testRecords,"","",null);
+    
+    addBinaryTestRecords(testRecords, "", " ; charset: UTF-8;charset=iso-8859-1",null);
+    addValidTextTypeRecords(testRecords, "", " ; charset: UTF-8;charset=iso-8859-1",null);
+    addValidHTMLTypeRecords(testRecords, "", " ; charset: UTF-8;charset=iso-8859-1",null);
+    addOtherValidTextTypeRecords(testRecords, "", " ; charset: UTF-8;charset=iso-8859-1",null);
+    addOtherValidTextTypeRecords(testRecords, ".", " ; charset: UTF-8;charset=iso-8859-1",null);
+    addTestApplicationStrings(testRecords,"", " ; charset: UTF-8;charset=iso-8859-1",null);
+    addAudioTestRecords(testRecords, "", " ; charset: UTF-8;charset=iso-8859-1",null);
+    addImageTestRecords(testRecords, "", " ; charset: UTF-8;charset=iso-8859-1",null);
+    addTestTextRecords(testRecords, "", " ; charset: UTF-8;charset=iso-8859-1",null);
+    addTestVideoRecords(testRecords, "", " ; charset: UTF-8;charset=iso-8859-1",null);
+    addMiscelaneousTestRecords(testRecords, "", " ; charset: UTF-8;charset=iso-8859-1",null);
+    addInvalidExtensions(testRecords,"."," ; charset: UTF-8;charset=iso-8859-1",null);
+    
+    for (TestRecord record : testRecords) { 
+      MimeTypeDisposition disposition = checkMimeTypeDisposition(record._testString);
+      if (disposition != record._expectedDisposition) { 
+        System.out.println("RECORD:" + record._testString + " Expected:" + record._expectedDisposition + " GOT:" + disposition);
       }
     }
+    
   }
 
 }

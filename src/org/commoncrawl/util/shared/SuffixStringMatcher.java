@@ -79,6 +79,23 @@ public class SuffixStringMatcher extends TrieStringMatcher {
     }
     return result;
   }
+  
+  /** Returns true if an exact match is found 
+   * 
+   * @param argv
+   */
+  public boolean exactMatch(String input) { 
+    TrieNode node = root;
+    for (int i = input.length() - 1; i >= 0; i--) {
+      node = node.getChild(input.charAt(i));
+      if (node == null)
+        break;
+      if (i== 0 && node.isTerminal()) { 
+        return true;
+      }
+    }
+    return false;    
+  }
 
   public static final void main(String[] argv) {
     SuffixStringMatcher matcher = new SuffixStringMatcher(new String[] { "a",
@@ -92,6 +109,12 @@ public class SuffixStringMatcher extends TrieStringMatcher {
       System.out.println("   matches: " + matcher.matches(tests[i]));
       System.out.println("  shortest: " + matcher.shortestMatch(tests[i]));
       System.out.println("   longest: " + matcher.longestMatch(tests[i]));
+
     }
+    System.out.println("   exact: " + matcher.exactMatch("foobar"));
+    System.out.println("   not exact: " + matcher.exactMatch("fooba"));
+    System.out.println("   not exact: " + matcher.exactMatch("foobarz"));
+    System.out.println("   exact: " + matcher.exactMatch("foo"));
+
   }
 }
