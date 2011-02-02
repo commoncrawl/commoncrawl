@@ -71,18 +71,20 @@ JNI_CPPFLAGS=""
 #JNI_CPPFLAGS="arch=x86_64 "
 
 if test $JAVA_HOME != ""; then
-  if test $JAVA_HOME/../Headers != ""; then
+  if test -e $JAVA_HOME/../Headers; then
     JNI_CPPFLAGS="$JNI_CPPFLAGS -I$JAVA_HOME/../Headers"
-	echo JNI_CPP_FLAGS ARE $JNI_CPPFLAGS
+        echo JNI_CPP_FLAGS ARE $JNI_CPPFLAGS
   else
-	  for dir in `find $JAVA_HOME/include -follow -type d`
-	  do
-	    JNI_CPPFLAGS="$JNI_CPPFLAGS -I$dir"
-	  done
+    for dir in `find $JAVA_HOME/include -follow -type d`
+      do
+        echo Including Java Dir:$dir
+        JNI_CPPFLAGS="$JNI_CPPFLAGS -I$dir"
+      done
   fi
 fi
 cppflags_bak=$CPPFLAGS
 CPPFLAGS="$CPPFLAGS $JNI_CPPFLAGS"
+echo CPPFLAGS ARE:$CPPFLAGS
 AC_CHECK_HEADERS([jni.h], [], AC_MSG_ERROR([Native java headers not found. Is \$JAVA_HOME set correctly?]))
 CPPFLAGS=$cppflags_bak
 AC_SUBST([JNI_CPPFLAGS])
