@@ -4,7 +4,6 @@ import java.util.ArrayList;
 
 import org.commoncrawl.io.shared.NIOHttpHeaders;
 import org.commoncrawl.protocol.shared.ArcFileHeaderItem;
-import org.commoncrawl.protocol.shared.ArcFileItem;
 
 /**
  * Support routines related to ArcFileItem

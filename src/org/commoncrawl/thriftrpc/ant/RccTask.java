@@ -148,15 +148,13 @@ public class RccTask extends Task {
       }
     }
     for (File srcLocation : srcList) {
-        //File genStampFile = getGenStampFile(srcLocation.getParentFile());
-        //if (!genStampFile.exists() || srcLocation.lastModified() > genStampFile.lastModified()) {
-      {
+        File genStampFile = getGenStampFile(srcLocation.getParentFile());
+      if (!genStampFile.exists() || srcLocation.lastModified() > genStampFile.lastModified()) {
           
           System.out.println("src:" + srcLocation.getAbsolutePath());
           
           doCompile(srcLocation);
           
-          /*
           genStampFile.delete();
           
           try { 
@@ -165,8 +163,7 @@ public class RccTask extends Task {
           catch (IOException e) { 
             throw new BuildException("Failed to create GenStamp File for src:" + srcLocation);
           }
-          */
-        }
+      }
     }
   }
   

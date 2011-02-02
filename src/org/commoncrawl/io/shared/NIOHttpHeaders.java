@@ -17,6 +17,7 @@
 package org.commoncrawl.io.shared;
 
 import java.io.*;
+import java.nio.charset.Charset;
 import java.util.Collections;
 import java.util.Map;
 import java.util.HashMap;
@@ -61,7 +62,7 @@ public final class NIOHttpHeaders {
     grow();
   }
 
-  public NIOHttpHeaders(StringReader is) throws java.io.IOException {
+  public NIOHttpHeaders(InputStream is) throws java.io.IOException {
     parseHeader(is);
   }
 
@@ -399,7 +400,7 @@ public final class NIOHttpHeaders {
   }
 
   /** Parse a MIME header from an input stream. */
-  public void parseHeader(StringReader is) throws java.io.IOException {
+  public void parseHeader(InputStream is) throws java.io.IOException {
     synchronized (this) {
       nkeys = 0;
     }
@@ -407,7 +408,7 @@ public final class NIOHttpHeaders {
   }
 
   /** Parse and merge a MIME header from an input stream. */
-  public void mergeHeader(StringReader is) throws java.io.IOException {
+  public void mergeHeader(InputStream is) throws java.io.IOException {
     if (is == null)
       return;
     char s[] = new char[10];
@@ -528,11 +529,7 @@ public final class NIOHttpHeaders {
     NIOHttpHeaders headersOut = new NIOHttpHeaders();
 
     if (headers != null && headers.length() != 0) {
-
-      headersOut.parseHeader(new StringReader(headers));
-
-      /*
-      */
+      headersOut.parseHeader(new ByteArrayInputStream(headers.getBytes(Charset.forName("UTF-8"))));
     }
     return headersOut;
   }

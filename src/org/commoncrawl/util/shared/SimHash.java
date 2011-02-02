@@ -128,9 +128,6 @@ public class SimHash {
 
   public static void main(String[] args) {
     try {
-      // File file1 = new File("/Users/rana/academia.edu_01.html");
-      // File file2 = new File("/Users/rana/academia.edu_02.html");
-
       File file1 = new File(args[0]);
       File file2 = new File(args[1]);
 

@@ -18,7 +18,7 @@ struct ThriftUnitTestStruct1 {
 
 #
 # service definitions  
-#
+# 
 
 service ThriftUnitTest {
   ThriftUnitTestStruct1 hello(1:ThriftUnitTestStruct1 input 2:string paramTwo);
