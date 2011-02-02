@@ -1,0 +1,645 @@
+options {
+STATIC=false;
+}
+
+PARSER_BEGIN(RPCCompiler)
+
+package org.commoncrawl.rpc.compiler.generated;
+
+import org.commoncrawl.rpc.compiler.*;
+import java.util.ArrayList;
+import java.util.Hashtable;
+import java.util.Iterator;
+import java.io.File;
+import java.io.FileReader;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.util.Set;
+import java.util.HashSet;
+
+public class RPCCompiler { 
+    private static String language = "java";
+    private static String destDir = ".";
+    private static ArrayList<String> recFiles = new ArrayList<String>();
+    private static ArrayList<String> cmdargs = new ArrayList<String>();
+    private static JFile curFile;
+    private static Hashtable<String,JRecord> recTab = new Hashtable<String,JRecord>();
+    private static Hashtable<String,JService> serviceTable = new Hashtable<String,JService>(); 
+	private static String curMethod = "";
+	private static String curService = "";
+	private static String curParamType = "";
+    private static String curDir = ".";
+    private static String curFileName;
+    private static String curModuleName;
+
+    public static void main(String[] args) {
+        System.exit(driver(args));
+    }
+ 
+    public static void usage() {
+        System.err.println("Usage: RPCCompiler --language [java|c++] ddl-files");
+    }
+
+    public static int driver(String[] args) {
+        for (int i=0; i<args.length; i++) {
+            if ("-l".equalsIgnoreCase(args[i]) ||
+                "--language".equalsIgnoreCase(args[i])) {
+                language = args[i+1].toLowerCase();
+                i++;
+            } else if ("-d".equalsIgnoreCase(args[i]) ||
+                "--destdir".equalsIgnoreCase(args[i])) {
+                destDir = args[i+1];
+                i++;
+            } else if (args[i].startsWith("-")) {
+              String arg = args[i].substring(1);
+              if (arg.startsWith("-")) {
+                arg = arg.substring(1);
+              }
+              cmdargs.add(arg.toLowerCase());
+            } else {
+                recFiles.add(args[i]);
+            }
+        }
+        if (recFiles.size() == 0) {
+            usage();
+            return 1;
+        }
+        for (int i=0; i<recFiles.size(); i++) {
+            curFileName = recFiles.get(i);
+            File file = new File(curFileName);
+            curDir = file.getParent();
+            
+            System.out.println("\n****PARSING FILE:" + file.toString() + "\n");
+            try {
+                FileReader reader = new FileReader(file);
+                RPCCompiler parser = new RPCCompiler(reader);
+                try {
+                    recTab = new Hashtable<String,JRecord>();
+                    curFile = parser.Input();
+                } catch (ParseException e) {
+                    System.err.println(e.toString());
+                    return 1;
+                }
+                try {
+                    reader.close();
+                } catch (IOException e) {
+                }
+            } catch (FileNotFoundException e) {
+                System.err.println("File " + (String) recFiles.get(i) +
+                    " Not found.");
+                return 1;
+            }
+            try {
+                int retCode = curFile.genCode(language, destDir, cmdargs);
+                if (retCode != 0) { return retCode; }
+            } catch (IOException e) {
+                System.err.println(e.toString());
+                return 1;
+            }
+        }
+        return 0;
+    }
+}
+
+PARSER_END(RPCCompiler)
+
+SKIP :
+{
+  " "
+| "\t"
+| "\n"
+| "\r"
+}
+
+SPECIAL_TOKEN :
+{
+  "//" : WithinOneLineComment
+}
+
+<WithinOneLineComment> SPECIAL_TOKEN :
+{
+  <("\n" | "\r" | "\r\n" )> : DEFAULT
+}
+
+<WithinOneLineComment> MORE :
+{
+  <~[]>
+}
+
+SPECIAL_TOKEN :
+{
+  "/*" : WithinMultiLineComment
+}
+
+<WithinMultiLineComment> SPECIAL_TOKEN :
+{
+  "*/" : DEFAULT
+}
+
+<WithinMultiLineComment> MORE :
+{
+  <~[]>
+}
+
+TOKEN :
+{
+    <MODULE_TKN: "module">
+|	<SERVICE_TKN: "service">
+|   <RECORD_TKN: "class">
+|   <METHOD_TKN: "method">
+|   <ENUM_TKN: "enum">
+|   <COMPARATOR_TKN: "comparator">
+|   <IN_TKN: "in">
+|   <OUT_TKN: "out">
+|   <INCLUDE_TKN: "include">
+|   <BYTE_TKN: "byte">
+|   <BOOLEAN_TKN: "boolean">
+|   <INT_TKN: "int">
+|   <LONG_TKN: "long">
+|   <VINT_TKN: "vint">
+|   <VLONG_TKN: "vlong">
+|   <FLOAT_TKN: "float">
+|   <DOUBLE_TKN: "double">
+|   <USTRING_TKN: "ustring">
+|   <BUFFER_TKN: "buffer">
+|   <VECTOR_TKN: "vector">
+|   <MAP_TKN: "map">
+|   <KEY_TKN: "key">
+|   <TRANSIENT_TKN: "transient">
+|   <EQUALS_TKN: "=">
+|   <LBRACE_TKN: "{">
+|   <RBRACE_TKN: "}">
+|   <LT_TKN: "<">
+|   <GT_TKN: ">">
+|   <LPAREN_TKN: "(">
+|   <RPAREN_TKN: ")">
+|   <SEMICOLON_TKN: ";">
+|   <COMMA_TKN: ",">
+|   <DOT_TKN: ".">
+|   <CSTRING_TKN: "\"" ( ~["\""] )+ "\"">
+|   <IDENT_TKN: ["A"-"Z","a"-"z"] (["a"-"z","A"-"Z","0"-"9","_"])*>
+|   <INTEGER_TKN: ["0"-"9"](["0"-"9"])*>
+}
+
+JFile Input() :
+{
+    ArrayList<JFile> ilist = new ArrayList<JFile>();
+    ArrayList<JRecord> rlist = new ArrayList<JRecord>();
+    ArrayList<JService> serviceList = new ArrayList<JService>();
+    JFile i;
+    ArrayList<JRecord> l;
+    JModule module;
+}
+{
+    (
+        i = Include()
+        { ilist.add(i); }
+    |   module = Module()
+        { 
+        	rlist.addAll(module.getRecords());
+        	serviceList.addAll(module.getServices()); 
+        }
+    )+
+    <EOF>
+    { return new JFile(curFileName, ilist, rlist,serviceList); }
+}
+
+JFile Include() :
+{
+    String fname;
+    Token t;
+}
+{
+    <INCLUDE_TKN>
+    t = <CSTRING_TKN>
+    {
+        JFile ret = null;
+        fname = t.image.replaceAll("^\"", "").replaceAll("\"$","");
+        File file = new File(curDir, fname);
+        String tmpDir = curDir;
+        String tmpFile = curFileName;
+        curDir = file.getParent();
+        curFileName = file.getName();
+        try {
+            FileReader reader = new FileReader(file);
+            RPCCompiler parser = new RPCCompiler(reader);
+            try {
+                ret = parser.Input();
+                System.out.println(fname + " Parsed Successfully");
+            } catch (ParseException e) {
+                System.out.println(e.toString());
+                System.exit(1);
+            }
+            try {
+                reader.close();
+            } catch (IOException e) {
+            }
+        } catch (FileNotFoundException e) {
+        		System.out.println("tmpDir is:" + tmpDir);
+            System.out.println("File " + fname +
+                " Not found. Path:" + file.getAbsolutePath());
+            System.exit(1);
+        }
+        curDir = tmpDir;
+        curFileName = tmpFile;
+        return ret;
+    }
+}
+
+JModule Module() :
+{
+	JModule module;
+    String mName;
+    JRecord record;
+    JService service;
+}
+{
+    <MODULE_TKN>
+    mName = ModuleName()
+    {
+    	System.out.println("Module Name:"+mName);
+    	curModuleName = mName;
+    	module = new JModule(mName); 
+    }
+    <LBRACE_TKN>   
+    (
+		service = Service()
+		{ module.addService(service); }
+	|
+	    record = Record()
+		{ 
+			if (record != null)
+				System.out.println("Record() returned:"+record.toString());
+			else 
+				System.out.println("Record() returned NULL");
+				
+			module.addRecord(record); 
+		}
+	)*
+    <RBRACE_TKN>
+    { return module; }
+}
+
+String ModuleName() :
+{
+    String name = "";
+    Token t;
+}
+{
+    t = <IDENT_TKN>
+    { name += t.image; }
+    (
+        <DOT_TKN>
+        t = <IDENT_TKN>
+        { name += "." + t.image; }
+    )*
+    { return name; }
+}
+
+JService Service() :
+{
+    String name;
+    ArrayList<JMethod> methodList = new ArrayList<JMethod>();
+    Token t;
+    JMethod m;
+}
+{
+    <SERVICE_TKN>
+    t = <IDENT_TKN>
+    { 
+		name = t.image; 
+		curService = name;
+	}
+    <LBRACE_TKN>
+    (
+        m = Method()
+        { methodList.add(m); }
+        <SEMICOLON_TKN>
+    )+
+    <RBRACE_TKN>
+     {
+        String fqn = curModuleName + "." + name;
+        JService service = new JService(fqn, methodList);
+        serviceTable.put(fqn, service);
+        return service;
+    }
+}
+
+JMethod Method() :
+{
+    String inputType = null;
+    String outputType = null;
+    Token name;
+	JRecord inputAnonymousRecord = null;
+	JRecord outputAnonymousRecord = null;
+}
+{
+    <METHOD_TKN>
+    name = <IDENT_TKN> 
+	{
+		curMethod = name.toString();
+	}
+    <LPAREN_TKN>
+    <IN_TKN>
+	{ curParamType = "input"; }
+    (inputType  = ModuleName() |
+	inputAnonymousRecord = AnonymousRecord())
+	<COMMA_TKN>
+	<OUT_TKN>    
+	{ curParamType = "output"; }
+	(outputType = ModuleName() |
+	outputAnonymousRecord = AnonymousRecord())
+    <RPAREN_TKN>
+    
+    {
+    	JRecord inputRecordType = null;
+    	JRecord outputRecordType = null;
+		if (inputAnonymousRecord != null) {
+			inputRecordType = inputAnonymousRecord;
+		}    	
+    	else if (inputType.compareTo("NullMessage") != 0) { 
+
+	        if (inputType.indexOf('.', 0) < 0) {
+	            inputType = curModuleName + "." + inputType;
+	        }
+	        
+	        inputRecordType = recTab.get(inputType);
+	        
+	        if (inputRecordType == null) {
+	            System.out.println("Input Param of Type " + inputType + " not known. Exiting.");
+	            System.exit(1);
+	        }
+	   	}
+		if (outputAnonymousRecord != null) {
+			outputRecordType = outputAnonymousRecord;
+		}
+		else if (outputType.compareTo("NullMessage") != 0) { 
+		
+	        if (outputType.indexOf('.', 0) < 0) {
+	            outputType = curModuleName + "." + outputType;
+	        }
+	        
+	        outputRecordType = recTab.get(outputType);
+	        
+	        if (outputRecordType == null) {
+	            System.out.println("Output Param of Type " + outputType + " not known. Exiting.");
+	            System.exit(1);
+	        }
+		}        
+    	return new JMethod(name.image,inputRecordType,outputRecordType); 
+    }
+}
+
+Set<String> RecordModifiers() :
+{
+	String  modifier;
+	Set<String> modifiers  = new HashSet<String>();
+}
+{
+	"[" modifier = RecordModifier() { modifiers.add(modifier);} ("," modifier = RecordModifier() { modifiers.add(modifier);})* "]"
+	
+	{ return modifiers; }
+}
+
+String RecordModifier() :
+{
+	Token modifier;
+}
+{
+	modifier = <IDENT_TKN>
+	{
+		return modifier.toString();
+	}
+}
+
+JRecord Record() :
+{
+	System.out.println("Entering Record Constructor");
+    String rname;
+    ArrayList<JField<JType>> flist = new ArrayList<JField<JType>>();
+    ArrayList<JEnum> enumList      = new ArrayList<JEnum>();
+	ArrayList<JComparator> comparators  = new ArrayList<JComparator>();
+    Token t;
+    JField<JType> f;
+    JEnum e;
+	JComparator c;
+    Set<String> modifiers = null;
+}
+{
+    <RECORD_TKN>
+    t = <IDENT_TKN>
+		[ modifiers = RecordModifiers() ]    
+    { rname = t.image; }
+    <LBRACE_TKN>
+    (
+        e = Enumeration()
+        { enumList.add(e); }
+        | 
+        f = Field()<SEMICOLON_TKN>
+        { flist.add(f); }
+		|
+		c = Comparator()
+		{ comparators.add(c);}
+    )+
+    <RBRACE_TKN>
+    {
+        String fqn = curModuleName + "." + rname;
+        System.out.println("fqn:"+fqn);
+        JRecord r = new JRecord(fqn, flist,enumList,modifiers,comparators);
+        recTab.put(fqn, r);
+        return r;
+    }
+}
+
+JRecord AnonymousRecord() :
+{
+	System.out.println("Entering AnonymousRecord Constructor");
+    ArrayList<JField<JType>> flist = new ArrayList<JField<JType>>();
+    Token t;
+    JField<JType> f;
+    Set<String> modifiers = new HashSet<String>();
+	
+}
+{
+    <LBRACE_TKN>
+    (
+        f = Field()<SEMICOLON_TKN>
+        { flist.add(f); }
+    )+
+    <RBRACE_TKN>
+    {
+		modifiers.add("anonymous");
+		String fqn = curMethod + "_" + curParamType;
+        JRecord r = new JRecord(fqn, flist,null,modifiers,null);
+        return r;
+    }
+}
+
+
+JComparator Comparator() : {
+	Token name;
+	ArrayList<String> fieldNames = new ArrayList<String>();
+	Token fieldName;
+}
+{
+	<COMPARATOR_TKN>
+	name = <IDENT_TKN>
+	<LBRACE_TKN>
+	(
+		fieldName = <IDENT_TKN><SEMICOLON_TKN>
+		{ fieldNames.add(fieldName.toString()); }
+	)+
+	<RBRACE_TKN>
+	{
+		return new JComparator(name.toString(),fieldNames);
+	}
+}
+
+JEnum Enumeration() : 
+{
+	Token name;
+	ArrayList<JEnumValue> values      = new ArrayList<JEnumValue>();
+	JEnumValue v;
+}
+{
+  	<ENUM_TKN> 
+  	name = <IDENT_TKN>
+  	<LBRACE_TKN>
+	(
+		v = EnumerationValue()
+		{ values.add(v); }	
+	)+  	
+  	<RBRACE_TKN>
+  	{
+  		return new JEnum(name.image,values);
+  	}
+}
+
+JEnumValue EnumerationValue() : 
+{
+	Token valueName;
+	Token ordinal;
+}
+{
+	valueName = <IDENT_TKN>
+	<EQUALS_TKN>
+	ordinal   = <INTEGER_TKN>
+	<SEMICOLON_TKN>
+	{ return new JEnumValue(valueName.image,Integer.parseInt(ordinal.image)); } 
+}
+
+int FieldModifiers() :
+{
+	int modifiers = 0;
+	int modifier  = 0;
+}
+{
+	"[" modifier = FieldModifier() { modifiers |= modifier;} ("," modifier = FieldModifier() { modifiers |= modifier;})* "]"
+	
+	{ return modifiers; }
+}
+
+int FieldModifier() :
+{
+	int modifier = 0;
+}
+{
+	(
+		LOOKAHEAD(2) 
+		(
+			"key" { modifier = JField.Modifiers.KEY; } | 
+			"transient" { modifier = JField.Modifiers.TRANSIENT; }
+		)
+	)*
+	{
+		return modifier;
+	}
+}
+
+JField<JType> Field() :
+{
+    JType jt;
+    Token name;
+    Token ordinal;
+	int modifiers = 0;
+}
+{
+	[ modifiers = FieldModifiers() ]
+    jt = Type()
+    name = <IDENT_TKN>
+    <EQUALS_TKN>
+    ordinal = <INTEGER_TKN>
+    { return new JField<JType>(name.image, jt,Integer.parseInt(ordinal.image),modifiers); }
+}
+
+JType Type() :
+{
+    JType jt;
+    Token t;
+    String rname;
+}
+{
+    jt = Map()
+    { return jt; }
+|   jt = Vector()
+    { return jt; }
+|   <BYTE_TKN>
+    { return new JByte(); }
+|   <BOOLEAN_TKN>
+    { return new JBoolean(); }
+|   <INT_TKN>
+    { return new JInt(false); }
+|   <LONG_TKN>
+    { return new JLong(false); }
+|   <VINT_TKN>
+    { return new JInt(true); }
+|   <VLONG_TKN>
+    { return new JLong(true); }
+|   <FLOAT_TKN>
+    { return new JFloat(); }
+|   <DOUBLE_TKN>
+    { return new JDouble(); }
+|   <USTRING_TKN>
+    { return new JString(); }
+|   <BUFFER_TKN>
+    { return new JBuffer(); }
+|   rname = ModuleName()
+    {
+        if (rname.indexOf('.', 0) < 0) {
+            rname = curModuleName + "." + rname;
+        }
+        JRecord r = recTab.get(rname);
+        if (r == null) {
+            System.out.println("Type " + rname + " not known. Exiting.");
+            System.exit(1);
+        }
+        return r;
+    }
+}
+
+JMap Map() :
+{
+    JType jt1;
+    JType jt2;
+}
+{
+    <MAP_TKN>
+    <LT_TKN>
+    jt1 = Type()
+    <COMMA_TKN>
+    jt2 = Type()
+    <GT_TKN>
+    { return new JMap(jt1, jt2); }
+}
+
+JVector Vector() :
+{
+    JType jt;
+}
+{
+    <VECTOR_TKN>
+    <LT_TKN>
+    jt = Type()
+    <GT_TKN>
+    { return new JVector(jt); }
+}

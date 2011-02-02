@@ -1,0 +1,12 @@
+<project name="crawlcommongs" default="record-parser"> 
+	<property name="javacc.home" value="${basedir}"/>
+  <target name="record-parser" >
+  
+  	<javacc
+             target="rcc.jj"
+             outputdirectory="./"
+             javacchome="${javacc.home}"
+             />
+    </target>
+	
+ </project>

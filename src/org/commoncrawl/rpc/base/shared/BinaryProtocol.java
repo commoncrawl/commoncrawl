@@ -19,19 +19,11 @@ package org.commoncrawl.rpc.base.shared;
 import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
-import java.util.ArrayList;
-
 import org.apache.hadoop.io.WritableUtils;
 import org.commoncrawl.util.shared.FlexBuffer;
 import org.commoncrawl.util.shared.TextBytes;
 
 public final class BinaryProtocol {
-
-  private static BinaryProtocol _singleton = new BinaryProtocol();
-
-  public static BinaryProtocol getSingleton() {
-    return _singleton;
-  }
 
   public static final int  RAW_PROTOCOL_VERSION           = 1;
 

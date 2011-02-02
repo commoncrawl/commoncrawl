@@ -1,9 +1,5 @@
 package org.commoncrawl.rpc.base.shared;
 
-import java.io.DataInput;
-import java.io.DataOutput;
-import java.io.IOException;
-
 public abstract class RPCStructWithId extends RPCStruct {
 
   private long _recordId;

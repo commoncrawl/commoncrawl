@@ -1,0 +1,19 @@
+module org.commoncrawl.rpc.base.internal {
+
+  class UnitTestStruct1[recordid] {
+
+   enum EnumeratedValue {	
+		ONE = 1;
+    TWO = 2;
+   }
+
+   int     intType   = 1;	
+	 long    longType  = 2;
+	 ustring stringType = 3;
+	 vector<ustring> vectorOfStrings = 4;
+  }
+  
+  service RPCTestService { 
+	 method hello(in UnitTestStruct1,out UnitTestStruct1);
+  }
+}

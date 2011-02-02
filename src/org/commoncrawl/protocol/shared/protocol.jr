@@ -1,0 +1,130 @@
+module org.commoncrawl.protocol.shared {
+
+  class ArcFileHeaderItem { 
+    ustring itemKey = 1;
+    ustring itemValue = 2;
+  }
+  
+  class ArcFileItem { 
+
+    ustring  uri = 1;
+    ustring  hostIP = 2;
+    long     timestamp =3;
+    ustring  mimeType =4;
+    int      recordLength =5;
+    vector<ArcFileHeaderItem> headerItems =6;
+    buffer   content =7;
+    ustring  arcFileName = 8;
+    int      arcFilePos =9;
+    
+    enum Flags { 
+      TruncatedInDownload = 1;
+      TruncatedInInflate  = 2;
+    }
+    int     flags = 10;
+    int     arcFileSize = 11;
+  }
+  
+  // metadata information in an HTML document
+  class HTMLMetaTags { 
+    
+      enum RobotsFlags { 
+        ALL = 1;
+        NO_INDEX = 2;
+        NO_FOLLOW = 4;
+        NO_ARCHIVE = 8;
+      }
+      // robots meta tag
+      byte robotsFlags = 1;
+      
+      enum Pragmas { 
+        NO_CACHE = 1;      
+      }
+      // http pragmas 
+      byte pragmas = 2;
+      
+      // if meta refresh tag was present 
+      ustring optionalRefreshURL = 3;
+      // refresh time
+      vint    optionalRefreshTime = 4;
+      
+      // other meta tags in name<LF>value<LF> format
+      ustring otherMetaTags = 6;
+  }
+  
+  
+  class ArcFileMetadata { 
+
+      // optional arc file name idenitfying source arc file 
+      ustring   arcFileName = 1;      
+      // url identifying this document   
+      ustring   docURL = 2;
+      // offset of this document within the arc file
+      vint      arcFileOffset = 3;
+      // length of this document within the arc file 
+      vint      arcFileLength = 4;
+      // ip address of server document was retrieved from 
+      int       sourceIPAddress =5;
+      // content type (normalized)
+      ustring   contentType = 6;
+      // content length (as specified by headers or computed)
+      vint      contentLength = 7;
+      // charset if available
+      ustring   charset = 8;
+      // signature of the arc file if present 
+      buffer    signature = 9;
+      // simhash (if text content type)
+      long      textSimHashValue = 10;
+
+      enum Flags { 
+        IS_ValidTextType = 1;
+      }
+      // flags
+      byte     flags = 12;
+      
+      // http result information 
+      enum HTTPResponseFlags{ 
+        HEADER_MISSING = 1;
+        VERSION_MISSING = 2;
+        VERSION_0_9 = 4;
+        VERSION_1_0 = 8;
+        VERSION_1_1 = 16;
+        ENCODED_IS_GZIP = 32;
+      }
+      byte    httpResponseFlags = 13;
+      vint    httpResultCode = 14;
+       
+      //  charset detected via byte stream detector  
+      ustring  detectedCharset = 15;
+      // mapping of detected charset to java charset name
+      ustring  javaCharset = 16; 
+      // meta tag info 
+      HTMLMetaTags metaTags = 17;
+      // title tag text 
+      ustring titleText = 18;
+      // optional base tag ... 
+      ustring baseURL = 20;
+      // anchors, as a stream of anchor + anchor text values separated by line feeds
+      ustring anchorTags = 21;
+      
+      // cache information 
+      vlong   httpDate = 22;
+      vlong   lastModifiedTime = 23;
+      ustring eTag = 24;
+      vlong   maxAge = 25;
+      vlong   expires = 26;
+      vlong   age  = 27;
+      
+      enum CacheControlFlags { 
+        
+        NO_CACHE = 1;
+        NO_STORE = 2;
+        VARY = 4;
+        MUST_REVALIDATE= 8;
+        PRIVATE = 16;
+      }
+      
+      byte    cacheControlFlags = 28;       
+   }
+   
+}

@@ -1,0 +1,21 @@
+URL: http://code.google.com/p/google-url/
+Version: Snapshot of Subversion trunk, revision [46]
+         (http://google-breakpad.googlecode.com/svn/trunk/)
+License: BSD
+         Note: Googleurl was developed by Google, and Google holds the
+         copyright.  Any contributions accepted from non-Google employees were
+         accepted under a Google contributor license agreement
+         (http://code.google.com/legal/individual-cla-v1.0.html or
+         http://code.google.com/legal/corporate-cla-v1.0.html)
+License File: LICENSE.txt (but see above)
+Description: A small library for parsing and canonicalizing URLs.
+Local Modifications:
+  - Added this file, README.google.
+  - Replaced base/logging.h with a stubbed-out version.
+  - Replaced base/scoped_ptr.h with a version that #includes our other
+    copy of scoped_ptr.h.
+  - Stubbed out url_canon_host.cc DoIDNHost to avoid depending on a ton of
+    ICU.
+  - In url_canon_interal, changed the type of several local varialbles from int
+    to size_t to fix compile warnings on Linux.
+  - In url_canon_interal, added define guards to deal with WINCE.
