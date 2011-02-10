@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.commoncrawl.thriftrpc.ant;
+package org.commoncrawl.rpc.thriftrpc.ant;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -249,7 +249,7 @@ public class RccTask extends Task {
     writer.println("import java.io.IOException;");
 
     writer.println("");
-    writer.println("import org.commoncrawl.thriftrpc.*;");
+    writer.println("import org.commoncrawl.rpc.thriftrpc.*;");
     writer.println("import org.apache.thrift.TException;");
     writer.println("import org.apache.thrift.protocol.TMessage;");
     writer.println("import org.apache.thrift.protocol.TProtocol;");
@@ -257,12 +257,12 @@ public class RccTask extends Task {
     writer.println("import org.apache.thrift.transport.TIOStreamTransport;");
     writer.println("import org.commoncrawl.io.internal.NIOBufferList;");
     writer.println("import org.commoncrawl.io.internal.NIOBufferListOutputStream;");
-    writer.println("import org.commoncrawl.thriftrpc.*;");
-    writer.println("import org.commoncrawl.thriftrpc.ThriftAsyncRequestProcessor;");
-    writer.println("import org.commoncrawl.thriftrpc.ThriftAsyncRemoteCallContext;");
-    writer.println("import org.commoncrawl.thriftrpc.ThriftAsyncRequest;");
-    writer.println("import org.commoncrawl.thriftrpc.ThriftAsyncRemoteClientChannel;");
-    writer.println("import org.commoncrawl.thriftrpc.ThriftAsyncServerChannel;");
+    writer.println("import org.commoncrawl.rpc.thriftrpc.*;");
+    writer.println("import org.commoncrawl.rpc.thriftrpc.ThriftAsyncRequestProcessor;");
+    writer.println("import org.commoncrawl.rpc.thriftrpc.ThriftAsyncRemoteCallContext;");
+    writer.println("import org.commoncrawl.rpc.thriftrpc.ThriftAsyncRequest;");
+    writer.println("import org.commoncrawl.rpc.thriftrpc.ThriftAsyncRemoteClientChannel;");
+    writer.println("import org.commoncrawl.rpc.thriftrpc.ThriftAsyncServerChannel;");
     writer.println("import " + packageName + "." + className +".*;");
 
     writer.println("class " + className +"_CCAsyncSupport {");

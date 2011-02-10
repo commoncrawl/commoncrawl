@@ -1,4 +1,4 @@
-namespace java org.commoncrawl.thriftrpc
+namespace java org.commoncrawl.rpc.thriftrpc
 
 #
 # data structures / enumerations 

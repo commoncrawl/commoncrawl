@@ -128,16 +128,16 @@ public class JRecord extends JCompType {
       cb.append("import org.commoncrawl.util.shared.TextBytes;\n");
       cb.append("import org.commoncrawl.util.shared.MurmurHash;\n");
       cb.append("import org.commoncrawl.util.shared.ImmutableBuffer;\n");
-      cb.append("import org.commoncrawl.rpc.base.shared.BinaryProtocol;\n");
+      cb.append("import org.commoncrawl.rpc.BinaryProtocol;\n");
       cb.append("import org.apache.hadoop.util.ReflectionUtils;\n");
       cb.append("import org.apache.hadoop.conf.Configuration;\n");
 
       cb.append("// Generated File: " + name + "\n");
       cb.append("public class " + name);
       if ((modifiers & Modifiers.HAS_RECORDID) != 0) {
-        cb.append(" extends org.commoncrawl.rpc.base.shared.RPCStructWithId ");
+        cb.append(" extends org.commoncrawl.rpc.RPCStructWithId ");
       } else {
-        cb.append(" extends org.commoncrawl.rpc.base.shared.RPCStruct ");
+        cb.append(" extends org.commoncrawl.rpc.RPCStruct ");
       }
 
       // if the field has no key then implement Writable only

@@ -1,4 +1,4 @@
-package org.commoncrawl.rpc.base.internal;
+package org.commoncrawl.rpc;
 
 import java.io.DataInputStream;
 import java.io.IOException;
@@ -8,6 +8,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.Map;
+import java.util.concurrent.ThreadPoolExecutor;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -21,13 +22,15 @@ import org.commoncrawl.io.internal.NIOClientSocket;
 import org.commoncrawl.io.internal.NIOClientSocketListener;
 import org.commoncrawl.io.internal.NIOClientTCPSocket;
 import org.commoncrawl.io.internal.NIOSocket;
-import org.commoncrawl.rpc.base.shared.BinaryProtocol;
-import org.commoncrawl.rpc.base.shared.RPCException;
-import org.commoncrawl.rpc.base.shared.RPCStruct;
 import org.commoncrawl.util.shared.CCStringUtils;
 
-public class AsyncClientChannel implements NIOClientSocketListener,
-    Comparable<AsyncClientChannel> {
+/** RPCChannel - A remotable version of the Channel abstraction. Used to 
+ * communicate with a remote RPCServer.
+ * @author rana
+ *
+ */
+public class RPCChannel implements NIOClientSocketListener,
+    Comparable<RPCChannel>, Channel {
 
   private static long _lastChannelId = 0;
 
@@ -36,7 +39,7 @@ public class AsyncClientChannel implements NIOClientSocketListener,
   public static interface ConnectionCallback {
 
     /** called when the Outgoing Channel is connected **/
-    void OutgoingChannelConnected(AsyncClientChannel channel);
+    void OutgoingChannelConnected(RPCChannel channel);
 
     /**
      * called when the Channel is disconnected
@@ -44,7 +47,7 @@ public class AsyncClientChannel implements NIOClientSocketListener,
      * @return true if you want to resend outgoing message, false to clear
      *         (cancel) outgoing messages
      */
-    boolean OutgoingChannelDisconnected(AsyncClientChannel channel);
+    boolean OutgoingChannelDisconnected(RPCChannel channel);
   }
 
   public static final Log                                  LOG                     = LogFactory
@@ -53,14 +56,19 @@ public class AsyncClientChannel implements NIOClientSocketListener,
   private static int                                       INITIAL_RECONNECT_DELAY = 1000;
   private static int                                       MAX_RECONNECT_DELAY     = 5000;
 
-  private EventLoop                                        _client;
+  // the event loop that is polling this channel's socket 
+  private EventLoop                                        _eventLoop;
+  // the optional thread pool in which callbacks (responses) from the remote client
+  // will run in
+  private ThreadPoolExecutor                               _optionalThreadPool;
   // private String _path;
   private int                                              _lastRequestId          = 0;
-  private Map<Integer, AsyncRequest<RPCStruct, RPCStruct>> _requestMap             = Collections
-                                                                                       .synchronizedMap(new HashMap<Integer, AsyncRequest<RPCStruct, RPCStruct>>());
+  private Map<Integer, OutgoingMessageContext<? extends RPCStruct, ? extends RPCStruct>> _requestMap
+   = Collections.synchronizedMap(new HashMap<Integer, OutgoingMessageContext<? extends RPCStruct, ? extends RPCStruct>>());
 
   // list of requests that were already sent
-  private LinkedList<AsyncRequest<RPCStruct, RPCStruct>>   _sendQueue              = new LinkedList<AsyncRequest<RPCStruct, RPCStruct>>();
+  private LinkedList<OutgoingMessageContext<? extends RPCStruct,? extends RPCStruct>>   
+    _sendQueue = new LinkedList<OutgoingMessageContext<? extends RPCStruct,? extends RPCStruct>>();
 
   // open for business or not
   private boolean                                          _isOpen                 = false;
@@ -81,31 +89,48 @@ public class AsyncClientChannel implements NIOClientSocketListener,
   RPCFrame.Encoder                                         _encoder                = new RPCFrame.Encoder(
                                                                                        _outputStream);
 
-  /** back pointer to server channel is this is an inoming client channel **/
-  AsyncServerChannel                                       _serverChannel          = null;
+  /** back pointer to server channel is this is an incoming client channel **/
+  RPCServerChannel                                          _serverChannel          = null;
   /** connection callback **/
   ConnectionCallback                                       _connectionCallback;                                                                                      ;
 
-  // constructor
-  public AsyncClientChannel(EventLoop client, InetSocketAddress localAddress,
+  /**
+   * Construct an RPCChannel that talks to a remote server 
+   * 
+   * @param eventLoop
+   * @param localAddress
+   * @param address
+   * @param callback
+   * @throws IOException
+   */
+  public RPCChannel(EventLoop eventLoop, ThreadPoolExecutor optionalThreadPool,
+      InetSocketAddress localAddress,
       InetSocketAddress address, ConnectionCallback callback)
       throws IOException {
 
-    synchronized (AsyncClientChannel.class) {
+    synchronized (RPCChannel.class) {
       _channelId = ++_lastChannelId;
     }
 
-    _client = client;
+    _eventLoop = eventLoop;
+    _optionalThreadPool = optionalThreadPool;
     // _path = servicePath;
     _address = address;
     _localAddress = localAddress;
     _connectionCallback = callback;
   }
 
-  public AsyncClientChannel(NIOClientTCPSocket socket,
-      AsyncServerChannel serverChannel) throws IOException {
+  /** 
+   * Internal Constructor for creating a RPCChannel on the server side
+   * 
+   * @param socket
+   * @param serverChannel
+   * @throws IOException
+   */
+  RPCChannel(NIOClientTCPSocket socket,
+      RPCServerChannel serverChannel) throws IOException {
 
-    synchronized (AsyncClientChannel.class) {
+    synchronized (RPCChannel.class) {
       _channelId = ++_lastChannelId;
     }
 
@@ -113,13 +138,13 @@ public class AsyncClientChannel implements NIOClientSocketListener,
     _isOpen = true;
     _serverChannel = serverChannel;
     _socket = socket;
-    _client = _serverChannel._asyncDispatcher;
+    _eventLoop = _serverChannel._eventLoop;
     _address = socket.getSocketAddress();
 
     // setup the listener relationship
     socket.setListener(this);
     // register for an initial read on the socket ...
-    _client.getSelector().registerForRead(_socket);
+    _eventLoop.getSelector().registerForRead(_socket);
   }
 
   public synchronized void open() throws IOException {
@@ -183,7 +208,7 @@ public class AsyncClientChannel implements NIOClientSocketListener,
         }
       });
       // register the timer
-      _client.setTimer(_reconnectTimer);
+      _eventLoop.setTimer(_reconnectTimer);
     }
     // either way, increase subsequent reconnect interval
     _reconnectDelay = Math.min(MAX_RECONNECT_DELAY, _reconnectDelay * 2);
@@ -195,20 +220,20 @@ public class AsyncClientChannel implements NIOClientSocketListener,
     _socket = new NIOClientTCPSocket(this._localAddress, this);
     _socket.connect(_address);
 
-    getClient().getSelector().registerForConnect(_socket);
+    getEventLoop().getSelector().registerForConnect(_socket);
 
   }
 
   private synchronized void disconnect(boolean flushQueues) {
 
     if (_reconnectTimer != null) {
-      _client.cancelTimer(_reconnectTimer);
+      _eventLoop.cancelTimer(_reconnectTimer);
       _reconnectTimer = null;
     }
 
     // disconnect the underlying socket
     if (_socket != null) {
-      _client.getSelector().cancelRegistration(_socket);
+      _eventLoop.getSelector().cancelRegistration(_socket);
       _socket.close();
       _socket = null;
     }
@@ -231,12 +256,12 @@ public class AsyncClientChannel implements NIOClientSocketListener,
     return (_serverChannel != null);
   }
 
-  AsyncServerChannel getServerChannel() {
+  RPCServerChannel getServerChannel() {
     return _serverChannel;
   }
 
-  @SuppressWarnings("unchecked")
-  public synchronized void sendRequest(AsyncRequest request)
+  @Override
+  public synchronized void sendRequest(OutgoingMessageContext<? extends RPCStruct,? extends RPCStruct> request)
       throws RPCException {
 
     int requestId = 0;
@@ -254,7 +279,7 @@ public class AsyncClientChannel implements NIOClientSocketListener,
       _sendQueue.add(request);
 
       if (_socket != null && _socket.isOpen()) {
-        getClient().getSelector().registerForReadAndWrite(_socket);
+        getEventLoop().getSelector().registerForReadAndWrite(_socket);
       }
 
     } catch (IOException e) {
@@ -269,8 +294,8 @@ public class AsyncClientChannel implements NIOClientSocketListener,
     }
   }
 
-  @SuppressWarnings("unchecked")
-  public synchronized void sendResponse(AsyncContext context)
+  @Override
+  public synchronized void sendResponse(IncomingMessageContext<? extends RPCStruct,? extends RPCStruct> context)
       throws RPCException {
 
     // LOG.info("Sending Response");
@@ -281,7 +306,7 @@ public class AsyncClientChannel implements NIOClientSocketListener,
 
     try {
       _encoder.encodeResponse(context);
-      getClient().getSelector().registerForReadAndWrite(_socket);
+      getEventLoop().getSelector().registerForReadAndWrite(_socket);
 
     } catch (IOException e) {
       LOG.error("IOException during encodeResponse in sendResponse::"
@@ -291,11 +316,12 @@ public class AsyncClientChannel implements NIOClientSocketListener,
     }
   }
 
-  public EventLoop getClient() {
-    return _client;
+  public EventLoop getEventLoop() {
+    return _eventLoop;
   }
 
   // @Override
+  @SuppressWarnings("unchecked")
   public synchronized void Connected(NIOClientSocket theSocket)
       throws IOException {
 
@@ -304,27 +330,27 @@ public class AsyncClientChannel implements NIOClientSocketListener,
     if (_sendQueue.size() != 0) {
 
       // swap out lists ....
-      LinkedList<AsyncRequest<RPCStruct, RPCStruct>> temp = _sendQueue;
-      _sendQueue = new LinkedList<AsyncRequest<RPCStruct, RPCStruct>>();
+      LinkedList<OutgoingMessageContext<? extends RPCStruct,? extends RPCStruct>> temp = _sendQueue;
+      _sendQueue = new LinkedList<OutgoingMessageContext<? extends RPCStruct,? extends RPCStruct>>();
       // and resend all messages ...
-      for (AsyncRequest<RPCStruct, RPCStruct> request : temp) {
+      for (OutgoingMessageContext<? extends RPCStruct,? extends RPCStruct> request : temp) {
         try {
           sendRequest(request);
         } catch (RPCException e) {
           LOG.error(e);
           // fail this request ...
           if (request.getCallback() != null) {
-            request.setStatus(AsyncRequest.Status.Error_RPCFailed);
+            request.setStatus(MessageData.Status.Error_RPCFailed);
             request.setErrorDesc("RPC Failed During Resend");
             request.getCallback().requestComplete(request);
           }
         }
       }
 
-      getClient().getSelector().registerForWrite(_socket);
+      getEventLoop().getSelector().registerForWrite(_socket);
     }
     if (_connectionCallback != null)
-      _connectionCallback.OutgoingChannelConnected(this);
+        _connectionCallback.OutgoingChannelConnected(this);
   }
 
   // @Override
@@ -356,18 +382,34 @@ public class AsyncClientChannel implements NIOClientSocketListener,
     }
   }
 
+  @SuppressWarnings("unchecked")
   private synchronized void cancelOutgoingMessages() {
 
-    LinkedList<AsyncRequest<RPCStruct, RPCStruct>> tempList = new LinkedList<AsyncRequest<RPCStruct, RPCStruct>>();
+    LinkedList<OutgoingMessageContext<? extends RPCStruct,? extends RPCStruct>> tempList 
+      = new LinkedList<OutgoingMessageContext<? extends RPCStruct,? extends RPCStruct>>();
 
     tempList.addAll(_sendQueue);
 
     _sendQueue.clear();
 
-    for (AsyncRequest<RPCStruct, RPCStruct> request : tempList) {
-      request.setStatus(AsyncRequest.Status.Error_RPCFailed);
+    for (final OutgoingMessageContext<? extends RPCStruct,? extends RPCStruct> request : tempList) {
+      request.setStatus(OutgoingMessageContext.Status.Error_RPCFailed);
       if (request.getCallback() != null) {
-        request.getCallback().requestComplete(request);
+        if (_optionalThreadPool != null) { 
+          // initiate callback via thread pool thread
+          _optionalThreadPool.submit(new Runnable()  {
+
+            @Override
+            public void run() {
+              request.getCallback().requestComplete(request);
+            } 
+            
+          });
+        }
+        else {
+          // initiate callback from within async thread 
+          request.getCallback().requestComplete(request);
+        }
       }
     }
     _sendQueue.clear();
@@ -428,14 +470,14 @@ public class AsyncClientChannel implements NIOClientSocketListener,
 
       // if the output buffer has data that needs to go out ...
       if (_output.isDataAvailable()) {
-        getClient().getSelector().registerForReadAndWrite(_socket);
+        getEventLoop().getSelector().registerForReadAndWrite(_socket);
       }
       // otherwise, we may be waiting for response frames ...
       // or this is an incoming socket, in which case we are always in a
       // readable state ...
       else if (_sendQueue.size() != 0 || isIncomingChannel()) {
         // if so, make socket readable ...
-        getClient().getSelector().registerForRead(_socket);
+        getEventLoop().getSelector().registerForRead(_socket);
       }
     } catch (IOException e) {
       LOG.error("IOException in Readable callback:"
@@ -494,9 +536,9 @@ public class AsyncClientChannel implements NIOClientSocketListener,
       } while (amountWritten > 0);
 
       if (_output.isDataAvailable()) {
-        getClient().getSelector().registerForReadAndWrite(_socket);
+        getEventLoop().getSelector().registerForReadAndWrite(_socket);
       } else if (_sendQueue.size() != 0 || isIncomingChannel()) {
-        getClient().getSelector().registerForRead(_socket);
+        getEventLoop().getSelector().registerForRead(_socket);
       }
     } catch (IOException e) {
       LOG.error("IOException in Writeable callback:" + e.toString());
@@ -513,7 +555,7 @@ public class AsyncClientChannel implements NIOClientSocketListener,
     while ((incoming = _decoder.getNextResponseFrame()) != null) {
 
       // lookup the request id in the sent map ...
-      AsyncRequest associatedRequest = _requestMap.get(incoming._requestId);
+      final OutgoingMessageContext associatedRequest = _requestMap.get(incoming._requestId);
 
       if (associatedRequest != null) {
 
@@ -527,16 +569,16 @@ public class AsyncClientChannel implements NIOClientSocketListener,
 
           // set status based on incoming stastus code ...
           associatedRequest
-              .setStatus(AsyncRequest.Status.values()[incoming._status]);
+              .setStatus(OutgoingMessageContext.Status.values()[incoming._status]);
           // and if success ... retrieve payload ...
 
-          if (associatedRequest.getStatus() == AsyncRequest.Status.Success) {
+          if (associatedRequest.getStatus() == OutgoingMessageContext.Status.Success) {
             // if found, deserialize the payload into the message object
             associatedRequest.getOutput().deserialize(
                 new DataInputStream(incoming._payload), new BinaryProtocol());
           }
           // and if server error ...
-          else if (associatedRequest.getStatus() == AsyncRequest.Status.Error_ServerError) {
+          else if (associatedRequest.getStatus() == OutgoingMessageContext.Status.Error_ServerError) {
             // attempt to read error desc if present ...
             if (incoming._payload.available() != 0) {
               associatedRequest.setErrorDesc((new DataInputStream(
@@ -547,12 +589,25 @@ public class AsyncClientChannel implements NIOClientSocketListener,
         } catch (IOException e) {
           LOG.error("IOException in readResponseFrame:"
               + CCStringUtils.stringifyException(e));
-          associatedRequest.setStatus(AsyncRequest.Status.Error_RPCFailed);
+          associatedRequest.setStatus(OutgoingMessageContext.Status.Error_RPCFailed);
         }
 
         // and initiate the callback
         if (associatedRequest.getCallback() != null) {
-          associatedRequest.getCallback().requestComplete(associatedRequest);
+          if (_optionalThreadPool != null) { 
+            // initiate callback via thread pool
+            _optionalThreadPool.submit(new Runnable() {
+
+              @Override
+              public void run() {
+                associatedRequest.getCallback().requestComplete(associatedRequest);
+              } 
+            });
+          }
+          else {
+            // initiate callback in event thread ..
+            associatedRequest.getCallback().requestComplete(associatedRequest);
+          }
         }
       } else {
         LOG.error("Orphaned request found in readResponseFrame");
@@ -574,10 +629,10 @@ public class AsyncClientChannel implements NIOClientSocketListener,
         e.printStackTrace();
         // if an RPC Exception is thrown at this point, we need to immediately
         // fail this request ...
-        AsyncContext<RPCStruct, RPCStruct> dummyContext = new AsyncContext<RPCStruct, RPCStruct>(
-            getServerChannel(), this, incoming._requestId, null, null);
+        IncomingMessageContext<RPCStruct, RPCStruct> dummyContext = new IncomingMessageContext<RPCStruct, RPCStruct>(
+            this,incoming._requestId, null, null);
 
-        dummyContext.setStatus(AsyncRequest.Status.Error_RPCFailed);
+        dummyContext.setStatus(MessageData.Status.Error_RPCFailed);
         dummyContext.setErrorDesc(e.toString());
         try {
           sendResponse(dummyContext);
@@ -600,7 +655,7 @@ public class AsyncClientChannel implements NIOClientSocketListener,
   }
 
   @Override
-  public int compareTo(AsyncClientChannel o) {
+  public int compareTo(RPCChannel o) {
     long comparisonResult = this._channelId - o._channelId;
     return (comparisonResult < 0 ? -1 : (comparisonResult > 0) ? 1 : 0);
   }

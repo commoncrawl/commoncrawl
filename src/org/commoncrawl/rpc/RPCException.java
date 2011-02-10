@@ -1,4 +1,4 @@
-package org.commoncrawl.rpc.base.shared;
+package org.commoncrawl.rpc;
 
 import java.io.IOException;
 

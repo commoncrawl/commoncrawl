@@ -1,4 +1,4 @@
-package org.commoncrawl.rpc.base.internal;
+package org.commoncrawl.rpc;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -11,27 +11,31 @@ import org.commoncrawl.io.internal.NIOClientTCPSocket;
 import org.commoncrawl.io.internal.NIOServerSocketListener;
 import org.commoncrawl.io.internal.NIOServerTCPSocket;
 import org.commoncrawl.io.internal.NIOSocket;
-import org.commoncrawl.rpc.base.shared.RPCException;
-import org.commoncrawl.rpc.base.shared.RPCStruct;
 
-public class AsyncServerChannel implements NIOServerSocketListener {
+/** 
+ * RPCServerChannel - Listens for and routes RPCMessages on a given 
+ * Socket/Endpoint.
+ * @author rana
+ *
+ */
+public class RPCServerChannel implements NIOServerSocketListener {
 
   public static interface ConnectionCallback {
 
-    void IncomingClientConnected(AsyncClientChannel channel);
+    void IncomingClientConnected(RPCChannel channel);
 
-    void IncomingClientDisconnected(AsyncClientChannel channel);
+    void IncomingClientDisconnected(RPCChannel channel);
 
   }
 
   private static int             INITIAL_RECONNECT_DELAY = 1000;
   InetSocketAddress              _address;
-  EventLoop                      _asyncDispatcher;
+  EventLoop                      _eventLoop;
   NIOServerTCPSocket             _socket;
   Timer                          _reconnectTimer         = null;
   int                            _reconnectDelay         = 0;
-  Server                         _server;
-  LinkedList<AsyncClientChannel> _activeClients          = new LinkedList<AsyncClientChannel>();
+  RPCActorService                         _server;
+  LinkedList<RPCChannel> _activeClients          = new LinkedList<RPCChannel>();
   ConnectionCallback             _callback;
 
   private enum State {
@@ -40,10 +44,10 @@ public class AsyncServerChannel implements NIOServerSocketListener {
 
   State _state = State.CLOSED;
 
-  public AsyncServerChannel(Server server, EventLoop client,
+  public RPCServerChannel(RPCActorService server, EventLoop eventLoop,
       InetSocketAddress address, ConnectionCallback callback) {
     _address = address;
-    _asyncDispatcher = client;
+    _eventLoop = eventLoop;
     _server = server;
     _callback = callback;
   }
@@ -88,7 +92,7 @@ public class AsyncServerChannel implements NIOServerSocketListener {
         }
       });
 
-      _asyncDispatcher.setTimer(_reconnectTimer);
+      _eventLoop.setTimer(_reconnectTimer);
     }
   }
 
@@ -100,7 +104,7 @@ public class AsyncServerChannel implements NIOServerSocketListener {
     if (_socket == null) {
       _socket = new NIOServerTCPSocket(this);
       _socket.open(_address);
-      _asyncDispatcher.getSelector().registerForAccept(_socket);
+      _eventLoop.getSelector().registerForAccept(_socket);
       // update state ...
       _state = State.OPEN_CONNECTED;
     }
@@ -109,16 +113,16 @@ public class AsyncServerChannel implements NIOServerSocketListener {
   void release() {
     // stop accepting sockets on this host ...
     if (_reconnectTimer != null) {
-      _asyncDispatcher.cancelTimer(_reconnectTimer);
+      _eventLoop.cancelTimer(_reconnectTimer);
       _reconnectTimer = null;
     }
     if (_socket != null) {
-      _asyncDispatcher.getSelector().cancelRegistration(_socket);
+      _eventLoop.getSelector().cancelRegistration(_socket);
       _socket.close();
       _socket = null;
     }
 
-    for (AsyncClientChannel client : _activeClients) {
+    for (RPCChannel client : _activeClients) {
       try {
         client.close();
       } catch (IOException e) {
@@ -130,19 +134,13 @@ public class AsyncServerChannel implements NIOServerSocketListener {
     _state = State.CLOSED;
   }
 
-  Server getServer() {
+  RPCActorService getServer() {
     return _server;
-  }
-
-  public void sendResponse(
-      AsyncContext<? extends RPCStruct, ? extends RPCStruct> context)
-      throws RPCException {
-    context.getClientChannel().sendResponse(context);
   }
 
   // @Override
   public void Accepted(NIOClientSocket newClientSocket) throws IOException {
-    AsyncClientChannel newChannel = new AsyncClientChannel(
+    RPCChannel newChannel = new RPCChannel(
         (NIOClientTCPSocket) newClientSocket, this);
     _activeClients.add(newChannel);
     if (_callback != null) {
@@ -156,15 +154,14 @@ public class AsyncServerChannel implements NIOServerSocketListener {
 
   }
 
-  void ClientChannelDisconnected(AsyncClientChannel channel) {
+  void ClientChannelDisconnected(RPCChannel channel) {
     if (_callback != null)
       _callback.IncomingClientDisconnected(channel);
     _activeClients.remove(channel);
   }
 
-  final void dispatchRequest(AsyncClientChannel source,
-      RPCFrame.IncomingFrame frame) throws RPCException {
-    getServer().dispatchRequest(this, source, frame);
+  final void dispatchRequest(RPCChannel source,RPCFrame.IncomingFrame frame) throws RPCException {
+    getServer().dispatchWireRequest(this, source, frame);
   }
 
   public void Excepted(NIOSocket socket, Exception e) {

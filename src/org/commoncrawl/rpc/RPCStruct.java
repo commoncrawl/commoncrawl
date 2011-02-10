@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package org.commoncrawl.rpc.base.shared;
+package org.commoncrawl.rpc;
 
 import java.io.DataInput;
 import java.io.DataOutput;

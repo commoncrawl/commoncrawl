@@ -17,34 +17,25 @@
 package org.commoncrawl.async;
 
 import java.io.IOException;
-import java.nio.channels.ClosedSelectorException;
-import java.nio.channels.SelectionKey;
-import java.util.Comparator;
-import java.util.Iterator;
-import java.util.TreeSet;
-import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.util.StringUtils;
-import org.apache.thrift.TException;
-import org.apache.thrift.async.TAsyncClient;
-import org.apache.thrift.async.TAsyncClientManager;
-import org.apache.thrift.async.TAsyncMethodCall;
 import org.commoncrawl.async.Callbacks.Callback;
 import org.commoncrawl.async.Callbacks.CallbackWithResult;
 import org.commoncrawl.io.internal.NIODNSLocalResolver;
 import org.commoncrawl.io.internal.NIOSocketSelector;
 import org.junit.Test;
 
-public final class EventLoop extends TAsyncClientManager implements Runnable  {
+public class EventLoop  implements Runnable  {
 
   /** logging **/
   private static final Log          LOG                = LogFactory
                                                            .getLog(EventLoop.class);
 
+  ExecutorService                   _resolverThreadPool = null;
   NIODNSLocalResolver               _resolver;
   NIOSocketSelector                 _selector;
   Thread                            _eventThread;
@@ -56,21 +47,21 @@ public final class EventLoop extends TAsyncClientManager implements Runnable  {
   
 
   public EventLoop()throws IOException {
-    init(Executors.newFixedThreadPool(1));
+    init(null);
     // stop the async client manager thread (we are managing sockets ourselves)
-    super.stop();
+    //super.stop();
   }
 
   public EventLoop(ExecutorService resolverThreadPool) throws IOException {
     init(resolverThreadPool);
     // stop the async client manager thread (we are managing sockets ourselves)
-    super.stop();
+    //super.stop();
   }
 
   private void init(ExecutorService resolverThreadPool) {
     try {
       _selector = new NIOSocketSelector(this);
-      _resolver = new NIODNSLocalResolver(this, resolverThreadPool, true);
+      _resolverThreadPool = resolverThreadPool;
 
     } catch (IOException e) {
       LOG.fatal("Unable to initialize NIO Selector");
@@ -84,6 +75,12 @@ public final class EventLoop extends TAsyncClientManager implements Runnable  {
   }
 
   public NIODNSLocalResolver getResolver() {
+    if (_resolver == null) { 
+      if (_resolverThreadPool == null) { 
+        _resolverThreadPool = Executors.newFixedThreadPool(1);
+      }
+      _resolver = new NIODNSLocalResolver(this, _resolverThreadPool, true);
+    }
     return _resolver;
   }
 
@@ -98,7 +95,7 @@ public final class EventLoop extends TAsyncClientManager implements Runnable  {
     _eventThread.start();
   }
 
-  @Override
+  //@Override
   public void stop() {
     if (_eventThread == null) {
       throw new RuntimeException("Invalid Call State");
@@ -130,11 +127,12 @@ public final class EventLoop extends TAsyncClientManager implements Runnable  {
 
   }
 
-  @Override
+  //@Override
   public boolean isRunning() {
     return (_eventThread != null && _eventThread.isAlive());  
   }
 
+  /*
   @SuppressWarnings("unchecked")
   @Override
   public void call(TAsyncMethodCall method) throws org.apache.thrift.TException {
@@ -143,6 +141,7 @@ public final class EventLoop extends TAsyncClientManager implements Runnable  {
     }
     _selector.call(method);
   }
+  */
   
   public void wakeup() {
 
@@ -201,7 +200,9 @@ public final class EventLoop extends TAsyncClientManager implements Runnable  {
 
         try {
           // long timeStart = System.currentTimeMillis();
-          _resolver.poll();
+          if (_resolver != null) {
+            _resolver.poll();
+          }
           // long timeEnd = System.currentTimeMillis();
 
           // timeStart = System.currentTimeMillis();

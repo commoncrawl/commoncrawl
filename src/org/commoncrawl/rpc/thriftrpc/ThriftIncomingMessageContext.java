@@ -1,4 +1,4 @@
-package org.commoncrawl.thriftrpc;
+package org.commoncrawl.rpc.thriftrpc;
 
 import java.io.IOException;
 
@@ -19,7 +19,7 @@ import org.commoncrawl.util.shared.CCStringUtils;
  *
  */
 @SuppressWarnings("unchecked")
-public class ThriftAsyncRemoteCallContext<InputArgs extends TBase,OutputArgs extends TBase> {
+public class ThriftIncomingMessageContext<InputArgs extends TBase,OutputArgs extends TBase> {
   
   TProtocol iprot;
   TProtocol oprot;
@@ -27,10 +27,10 @@ public class ThriftAsyncRemoteCallContext<InputArgs extends TBase,OutputArgs ext
   TMessage  msg = null;
   InputArgs inputArgs;
   OutputArgs outputArgs;
-  ThriftAsyncServerChannel serverChannel;
-  ThriftAsyncRemoteClientChannel clientChannel;
+  ThriftRPCServerChannel serverChannel;
+  ThriftRPCClientChannel clientChannel;
   
-  public ThriftAsyncRemoteCallContext(ThriftAsyncServerChannel serverChannel,ThriftAsyncRemoteClientChannel channel,TMessage message,TProtocol inputProtocol,InputArgs inputArgs,OutputArgs outputArgs) throws TException {
+  public ThriftIncomingMessageContext(ThriftRPCServerChannel serverChannel,ThriftRPCClientChannel channel,TMessage message,TProtocol inputProtocol,InputArgs inputArgs,OutputArgs outputArgs) throws TException {
     this.serverChannel = serverChannel;
     this.clientChannel = channel;
     // initialize input protocol 
@@ -69,7 +69,7 @@ public class ThriftAsyncRemoteCallContext<InputArgs extends TBase,OutputArgs ext
    * 
    * @return the server channel associated with this request 
    */
-  public ThriftAsyncServerChannel getServerChannel() { 
+  public ThriftRPCServerChannel getServerChannel() { 
     return serverChannel;
   }
 
@@ -77,7 +77,7 @@ public class ThriftAsyncRemoteCallContext<InputArgs extends TBase,OutputArgs ext
    * 
    * @return the remote client channel associated with the request..
    */
-  public ThriftAsyncRemoteClientChannel getClientChannel() { 
+  public ThriftRPCClientChannel getClientChannel() { 
     return clientChannel;
   }
   
@@ -98,7 +98,7 @@ public class ThriftAsyncRemoteCallContext<InputArgs extends TBase,OutputArgs ext
     try {
       clientChannel.responseReady(this.responseBuffer);
     } catch (IOException e) {
-      ThriftAsyncServerChannel.LOG.error(CCStringUtils.stringifyException(e));
+      ThriftRPCServerChannel.LOG.error(CCStringUtils.stringifyException(e));
       // close channel... we are hosed 
       clientChannel.close();
       // bubble up
@@ -121,7 +121,7 @@ public class ThriftAsyncRemoteCallContext<InputArgs extends TBase,OutputArgs ext
     try {
       clientChannel.responseReady(this.responseBuffer);
     } catch (IOException e1) {
-      ThriftAsyncServerChannel.LOG.error(CCStringUtils.stringifyException(e1));
+      ThriftRPCServerChannel.LOG.error(CCStringUtils.stringifyException(e1));
       // close channel... we are hosed
       clientChannel.close();
       // bubble up

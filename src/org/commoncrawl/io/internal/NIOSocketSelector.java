@@ -32,9 +32,9 @@ import java.util.concurrent.TimeoutException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.util.StringUtils;
-import org.apache.thrift.TException;
-import org.apache.thrift.async.TAsyncClient;
-import org.apache.thrift.async.TAsyncMethodCall;
+//import org.apache.thrift.TException;
+//import org.apache.thrift.async.TAsyncClient;
+//import org.apache.thrift.async.TAsyncMethodCall;
 import org.commoncrawl.async.EventLoop;
 import org.commoncrawl.util.shared.CCStringUtils;
 
@@ -52,8 +52,8 @@ public class NIOSocketSelector {
 
   public static final Log LOG = LogFactory.getLog("org.commoncrawl.io.NIOSocketSelector");
   
-  private final TreeSet<TAsyncMethodCall> timeoutWatchSet = new TreeSet<TAsyncMethodCall>(new TAsyncMethodCallTimeoutComparator());
-  private final ConcurrentLinkedQueue<TAsyncMethodCall> pendingCalls = new ConcurrentLinkedQueue<TAsyncMethodCall>();
+  //private final TreeSet<TAsyncMethodCall> timeoutWatchSet = new TreeSet<TAsyncMethodCall>(new TAsyncMethodCallTimeoutComparator());
+  //private final ConcurrentLinkedQueue<TAsyncMethodCall> pendingCalls = new ConcurrentLinkedQueue<TAsyncMethodCall>();
   
   
   private static class PendingRegistration { 
@@ -90,6 +90,7 @@ public class NIOSocketSelector {
     _selector = Selector.open();
   }
   
+  /*
   public void call(TAsyncMethodCall method)throws TException { 
     method.prepareMethodCall();
     pendingCalls.add(method);
@@ -100,6 +101,7 @@ public class NIOSocketSelector {
       throw new TException(e);
     }
   }
+  */
   
   /** register a socket for CONNECT events */
   public void registerForConnect(NIOClientSocket theSocket)throws IOException  {
@@ -252,6 +254,7 @@ public class NIOSocketSelector {
       timeUsageDetailOut.unblockedTime += (timeEnd - timeStart);
     }
     
+    /*
     if (timeoutWatchSet.size() != 0) { 
       // We have a timeout pending, so calculate the time until then and select appropriately
       long nextTimeout = timeoutWatchSet.first().getTimeoutTimestamp();
@@ -260,6 +263,7 @@ public class NIOSocketSelector {
         timeoutValue = Math.max(selectTime,0);
       }
     }
+    */
     timeStart = System.currentTimeMillis();
     
     int count = 0;
@@ -294,10 +298,12 @@ public class NIOSocketSelector {
         if (selectionKey.isValid()) { 
 
           Object attachment = selectionKey.attachment();
+          /*
           if (attachment instanceof TAsyncMethodCall) {
             transitionThriftMethod((TAsyncMethodCall)attachment,selectionKey);
           }
-          else if (attachment instanceof NIOSocket) {
+          */
+          if (attachment instanceof NIOSocket) {
             NIOSocket theSocket = (NIOSocket) selectionKey.attachment();
             
             if (theSocket != null && theSocket.getListener() != null) { 
@@ -476,8 +482,8 @@ public class NIOSocketSelector {
           }
         }
       }
-      timeoutThriftMethods();
-      startPendingThriftMethods();      
+      //timeoutThriftMethods();
+      //startPendingThriftMethods();      
       
       long unblockedTimeEnd = System.currentTimeMillis();
       if (timeUsageDetailOut != null) { 
@@ -508,6 +514,7 @@ public class NIOSocketSelector {
     
   
   /** Comparator used in TreeSet */
+  /*
   private static class TAsyncMethodCallTimeoutComparator implements Comparator<TAsyncMethodCall> {
     @SuppressWarnings("unchecked")
     @Override
@@ -570,5 +577,6 @@ public class NIOSocketSelector {
     } catch (ClosedSelectorException e) {
       LOG.error("Caught ClosedSelectorException in TAsyncClientManager!", e);
     }
-  }  
+  }
+  */  
 }

@@ -1,4 +1,4 @@
-package org.commoncrawl.rpc.base.internal;
+package org.commoncrawl.rpc;
 
 import static org.junit.Assert.assertTrue;
 
@@ -18,12 +18,17 @@ import org.apache.commons.logging.LogFactory;
 import org.commoncrawl.io.internal.NIOBufferList;
 import org.commoncrawl.io.internal.NIOBufferListInputStream;
 import org.commoncrawl.io.internal.NIOBufferListOutputStream;
-import org.commoncrawl.rpc.base.internal.UnitTestStruct1;
-import org.commoncrawl.rpc.base.shared.BinaryProtocol;
+import org.commoncrawl.rpc.UnitTestStruct1;
 import org.commoncrawl.util.shared.CCStringUtils;
 import org.commoncrawl.util.shared.TextBytes;
 import org.junit.Test;
 
+/**
+ * The Framing Protocol used to represent a wire level CC Message
+ * 
+ * @author rana
+ *
+ */
 public class RPCFrame {
 
   // FRAME:
@@ -209,7 +214,7 @@ public class RPCFrame {
     }
 
     @SuppressWarnings("unchecked")
-    public int encodeResponse(AsyncContext context) throws IOException {
+    public int encodeResponse(IncomingMessageContext context) throws IOException {
 
       HeaderOutputStream headerStream = new HeaderOutputStream();
 
@@ -228,7 +233,7 @@ public class RPCFrame {
       headerStream.writeByteField(RPCFrame.MSG_HEADER_FIELD_STATUS, context
           .getStatus().ordinal());
 
-      if (context.getStatus() != AsyncRequest.Status.Success) {
+      if (context.getStatus() != OutgoingMessageContext.Status.Success) {
         if (context.getErrorDesc() != null
             && context.getErrorDesc().length() != 0) {
           payloadStream.writeUTF(context.getErrorDesc());
@@ -244,7 +249,7 @@ public class RPCFrame {
     }
 
     @SuppressWarnings("unchecked")
-    public int encodeRequest(AsyncRequest request) throws IOException {
+    public int encodeRequest(OutgoingMessageContext request) throws IOException {
 
       HeaderOutputStream headerStream = new HeaderOutputStream();
 
@@ -258,10 +263,10 @@ public class RPCFrame {
           RPCFrame.MSG_TYPE.REQUEST.ordinal());
 
       headerStream.writeUTFField(RPCFrame.MSG_HEADER_FIELD_SERVICE, request
-          .getService());
+          .getServiceName());
 
       headerStream.writeUTFField(RPCFrame.MSG_HEADER_FIELD_METHOD, request
-          .getMethod());
+          .getMethodName());
 
       headerStream.writeIntField(RPCFrame.MSG_HEADER_FIELD_REQUEST_ID, request
           .getRequestId());
@@ -748,10 +753,11 @@ public class RPCFrame {
     inputStruct.getVectorOfStrings().add(new TextBytes("two"));
     inputStruct.getVectorOfStrings().add(new TextBytes("three"));
 
-    AsyncRequest<UnitTestStruct1, UnitTestStruct1> request = new AsyncRequest<UnitTestStruct1, UnitTestStruct1>(
+    OutgoingMessageContext<UnitTestStruct1, UnitTestStruct1> request = new OutgoingMessageContext<UnitTestStruct1, UnitTestStruct1>(
         "testService", "testMethod", inputStruct, outputStruct, null);
-    request.setRequestId(10);
 
+    request.setRequestId(10);
+    
     encoder.encodeRequest(request);
 
     // stream the data in one byte at a time

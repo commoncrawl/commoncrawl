@@ -1,4 +1,4 @@
-module org.commoncrawl.rpc.base.internal {
+module org.commoncrawl.rpc {
 
   class UnitTestStruct1[recordid] {
 

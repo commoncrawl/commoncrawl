@@ -1,17 +1,21 @@
-package org.commoncrawl.rpc.base.internal;
+package org.commoncrawl.rpc;
 
 import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
 
-import org.commoncrawl.rpc.base.shared.BinaryProtocol;
-import org.commoncrawl.rpc.base.shared.RPCStruct;
 
-public class NullMessage extends RPCStruct {
+/**
+ * An empty data structure
+ * 
+ * @author rana
+ *
+ */
+public class EmptyStruct extends RPCStruct {
 
-  static NullMessage singleton = new NullMessage();
+  static EmptyStruct singleton = new EmptyStruct();
 
-  public static NullMessage getSingleton() {
+  public static EmptyStruct getSingleton() {
     return singleton;
   }
 

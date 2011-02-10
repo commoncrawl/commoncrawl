@@ -1,4 +1,4 @@
-package org.commoncrawl.thriftrpc;
+package org.commoncrawl.rpc.thriftrpc;
 
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
@@ -21,53 +21,36 @@ package org.commoncrawl.thriftrpc;
 
 
 import java.io.IOException;
-import java.io.StringWriter;
-import java.lang.reflect.Method;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
-import java.nio.channels.spi.AbstractSelectableChannel;
 import java.util.ArrayList;
-import java.util.Map;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.thrift.TException;
-import org.apache.thrift.TFieldIdEnum;
-import org.apache.thrift.TProcessor;
-import org.apache.thrift.async.AsyncMethodCallback;
-import org.apache.thrift.meta_data.FieldMetaData;
 import org.apache.thrift.protocol.TBinaryProtocol;
-import org.apache.thrift.protocol.TProtocol;
 import org.apache.thrift.protocol.TProtocolFactory;
 import org.apache.thrift.server.TServer.AbstractServerArgs;
 import org.apache.thrift.transport.TFramedTransport;
 import org.apache.thrift.transport.TNonblockingServerTransport;
 import org.apache.thrift.transport.TNonblockingSocket;
 import org.apache.thrift.transport.TNonblockingTransport;
-import org.apache.thrift.transport.TServerSocket;
-import org.apache.thrift.transport.TServerTransport;
 import org.apache.thrift.transport.TTransportException;
 import org.commoncrawl.async.EventLoop;
 import org.commoncrawl.async.Timer;
 import org.commoncrawl.io.internal.NIOClientSocket;
-import org.commoncrawl.io.internal.NIOClientTCPSocket;
-import org.commoncrawl.io.internal.NIOServerSocket;
 import org.commoncrawl.io.internal.NIOServerSocketListener;
 import org.commoncrawl.io.internal.NIOServerTCPSocket;
 import org.commoncrawl.io.internal.NIOSocket;
-import org.commoncrawl.io.internal.NIOSocketListener;
-import org.commoncrawl.thriftrpc.ThriftUnitTest;
-import org.commoncrawl.thriftrpc.ThriftUnitTestStruct1;
-import org.commoncrawl.thriftrpc.ThriftUnitTest_CCAsyncSupport;
-import org.commoncrawl.thriftrpc.ThriftUnitTest.hello2_args;
-import org.commoncrawl.thriftrpc.ThriftUnitTest.hello2_result;
-import org.commoncrawl.thriftrpc.ThriftUnitTest.hello_args;
-import org.commoncrawl.thriftrpc.ThriftUnitTest.hello_result;
-import org.commoncrawl.thriftrpc.ThriftUnitTest_CCAsyncSupport.ThriftUnitTest_AsyncCallStub;
-import org.commoncrawl.thriftrpc.ThriftUnitTest_CCAsyncSupport.ThriftUnitTest_AsyncIFace;
-import org.commoncrawl.thriftrpc.ThriftUnitTest_CCAsyncSupport.ThriftUnitTest_RequestProcessor;
+import org.commoncrawl.rpc.thriftrpc.ThriftUnitTest.hello2_args;
+import org.commoncrawl.rpc.thriftrpc.ThriftUnitTest.hello2_result;
+import org.commoncrawl.rpc.thriftrpc.ThriftUnitTest.hello_args;
+import org.commoncrawl.rpc.thriftrpc.ThriftUnitTest.hello_result;
+import org.commoncrawl.rpc.thriftrpc.ThriftUnitTest_CCAsyncSupport.ThriftUnitTest_AsyncCallStub;
+import org.commoncrawl.rpc.thriftrpc.ThriftUnitTest_CCAsyncSupport.ThriftUnitTest_AsyncIFace;
+import org.commoncrawl.rpc.thriftrpc.ThriftUnitTest_CCAsyncSupport.ThriftUnitTest_RequestProcessor;
 import org.commoncrawl.util.shared.CCStringUtils;
 
 /**
@@ -81,10 +64,10 @@ import org.commoncrawl.util.shared.CCStringUtils;
  * transport, otherwise this server will be unable to determine when a whole
  * method call has been read off the wire. Clients must also use TFramedTransport.
  */
-public class ThriftAsyncServerChannel implements NIOServerSocketListener {
+public class ThriftRPCServerChannel implements NIOServerSocketListener {
   
   
-  public static final Log LOG = LogFactory.getLog(ThriftAsyncServerChannel.class);
+  public static final Log LOG = LogFactory.getLog(ThriftRPCServerChannel.class);
 
 
   public static class Args extends AbstractNonblockingServerArgs<Args> {
@@ -116,7 +99,7 @@ public class ThriftAsyncServerChannel implements NIOServerSocketListener {
   long readBufferBytesAllocated = 0;
   
  
-  final ThriftAsyncRequestProcessor       processor;
+  final ThriftRPCMessageDispatcher       processor;
   final TProtocolFactory inputProtocolFactory = new TBinaryProtocol.Factory();
   final TProtocolFactory outputProtocolFactory = new TBinaryProtocol.Factory();
   EventLoop              eventLoop;
@@ -134,7 +117,7 @@ public class ThriftAsyncServerChannel implements NIOServerSocketListener {
   State _state = State.CLOSED;
 
 
-  public ThriftAsyncServerChannel(EventLoop eventLoop,InetSocketAddress bindAddress,ThriftAsyncRequestProcessor processor,long max_read_buffer_size) {
+  public ThriftRPCServerChannel(EventLoop eventLoop,InetSocketAddress bindAddress,ThriftRPCMessageDispatcher processor,long max_read_buffer_size) {
     
     MAX_READ_BUFFER_BYTES = max_read_buffer_size;
     this._address = bindAddress;
@@ -217,7 +200,7 @@ public class ThriftAsyncServerChannel implements NIOServerSocketListener {
    * Perform an invocation. This method could behave several different ways
    * - invoke immediately inline, queue for separate execution, etc.
    */
-  protected boolean requestInvoke(ThriftAsyncRemoteClientChannel channel)throws TException {
+  protected boolean requestInvoke(ThriftRPCClientChannel channel)throws TException {
     // invoke on the channel 
     channel.invoke();
     // and prepare for the next frame 
@@ -229,7 +212,7 @@ public class ThriftAsyncServerChannel implements NIOServerSocketListener {
    * A ThriftAsyncRemoteClientChannel wants to change its selection preferences, but might not be
    * in the select thread.
    */
-  protected void requestSelectInterestChange(final ThriftAsyncRemoteClientChannel buffer) {
+  protected void requestSelectInterestChange(final ThriftRPCClientChannel buffer) {
     eventLoop.setTimer(new Timer(0, false, new Timer.Callback() {
       
       @Override
@@ -245,7 +228,7 @@ public class ThriftAsyncServerChannel implements NIOServerSocketListener {
    */
   private void cleanupSelectionkey(SelectionKey key) {
     // remove the records from the two maps
-    ThriftAsyncRemoteClientChannel buffer = (ThriftAsyncRemoteClientChannel)key.attachment();
+    ThriftRPCClientChannel buffer = (ThriftRPCClientChannel)key.attachment();
     if (buffer != null) {
       // close the buffer
       buffer.close();
@@ -269,7 +252,7 @@ public class ThriftAsyncServerChannel implements NIOServerSocketListener {
       }
 
       // add this key to the map
-      ThriftAsyncRemoteClientChannel frameBuffer = new ThriftAsyncRemoteClientChannel(this, this,client, clientKey);
+      ThriftRPCClientChannel frameBuffer = new ThriftRPCClientChannel(this, this,client, clientKey);
       clientKey.attach(frameBuffer);
     } catch (TTransportException tte) {
       // something went wrong accepting.
@@ -300,7 +283,7 @@ public class ThriftAsyncServerChannel implements NIOServerSocketListener {
     ThriftUnitTest_RequestProcessor asyncProcessor = new ThriftUnitTest_RequestProcessor(new ThriftUnitTest_AsyncIFace() {
 
       @Override
-      public void ThriftUnitTest_hello(final ThriftAsyncRemoteCallContext<hello_args, hello_result> context)throws TException {
+      public void ThriftUnitTest_hello(final ThriftIncomingMessageContext<hello_args, hello_result> context)throws TException {
         System.out.println("Server received hello:" + context.getInput().getParamTwo() + " MessageIdx:" + context.getInput().input.intType);
         //System.out.println("IntType:" + context.getInput().input.intType);
         //System.out.println("LongType:" + context.getInput().input.longType);
@@ -334,7 +317,7 @@ public class ThriftAsyncServerChannel implements NIOServerSocketListener {
       }
 
       @Override
-      public void ThriftUnitTest_hello2(ThriftAsyncRemoteCallContext<hello2_args, hello2_result> context)throws TException {
+      public void ThriftUnitTest_hello2(ThriftIncomingMessageContext<hello2_args, hello2_result> context)throws TException {
         System.out.println("Server received hello2");
         context.completeRequest();
       } 
@@ -353,22 +336,22 @@ public class ThriftAsyncServerChannel implements NIOServerSocketListener {
           try {
             final EventLoop childEventLoop = new EventLoop();
             // open channel to remote ... 
-            final ThriftAsyncClientChannel channel 
-            = new ThriftAsyncClientChannel(childEventLoop,
+            final ThriftRPCChannel channel 
+            = new ThriftRPCChannel(childEventLoop,
                 new TBinaryProtocol.Factory(),
                 new TBinaryProtocol.Factory(),
                 new InetSocketAddress(InetAddress.getLocalHost(),0), 
                 new InetSocketAddress(InetAddress.getLocalHost(), 9090),
-                new ThriftAsyncClientChannel.ConnectionCallback() {
+                new ThriftRPCChannel.ConnectionCallback() {
                   int receviedMessageCount = 0;
                   
                   @Override
-                  public void OutgoingChannelDisconnected(ThriftAsyncClientChannel channel) {
+                  public void OutgoingChannelDisconnected(ThriftRPCChannel channel) {
                     
                   }
                   
                   @Override
-                  public void OutgoingChannelConnected(ThriftAsyncClientChannel channel) {
+                  public void OutgoingChannelConnected(ThriftRPCChannel channel) {
                     ThriftUnitTest_AsyncCallStub stub = new ThriftUnitTest_AsyncCallStub(channel);
                     final int MessageCount = 1000;
                     for (int i=0;i<MessageCount;++i) {
@@ -385,10 +368,10 @@ public class ThriftAsyncServerChannel implements NIOServerSocketListener {
                       
                       try {
                         //System.out.println("Client Channel Sending Message");
-                        stub.hello(struct1, "hello from thread:" + threadIdx, new ThriftAsyncRequest.ThriftAsyncRequestCallback<hello_args,hello_result>() {
+                        stub.hello(struct1, "hello from thread:" + threadIdx, new ThriftOutgoingMessageContext.ThriftAsyncRequestCallback<hello_args,hello_result>() {
     
                           @Override
-                          public void onComplete(ThriftAsyncRequest<hello_args,hello_result> request) {
+                          public void onComplete(ThriftOutgoingMessageContext<hello_args,hello_result> request) {
                             System.out.println("Client Channel:" + threadIdx + "Recvd onComplete for msg:" + request.getResultArgs().success.intType);
                             /*
                             System.out.println("received response");
@@ -407,7 +390,7 @@ public class ThriftAsyncServerChannel implements NIOServerSocketListener {
                           }
     
                           @Override
-                          public void onError(ThriftAsyncRequest<hello_args,hello_result> result,Exception exception) {
+                          public void onError(ThriftOutgoingMessageContext<hello_args,hello_result> result,Exception exception) {
                             System.out.println("Client Channel Recvd onError");
                             exception.printStackTrace();
                             childEventLoop.stop();
@@ -442,7 +425,7 @@ public class ThriftAsyncServerChannel implements NIOServerSocketListener {
     System.out.println("Starting Child");
     
     System.out.println("Starting Server");
-    ThriftAsyncServerChannel server = new ThriftAsyncServerChannel(eventLoop,new InetSocketAddress(InetAddress.getLocalHost(),9090),asyncProcessor,Long.MAX_VALUE);
+    ThriftRPCServerChannel server = new ThriftRPCServerChannel(eventLoop,new InetSocketAddress(InetAddress.getLocalHost(),9090),asyncProcessor,Long.MAX_VALUE);
     server.open();
     eventLoop.start();
   } catch (IOException e) {

@@ -1,4 +1,4 @@
-package org.commoncrawl.thriftrpc;
+package org.commoncrawl.rpc.thriftrpc;
 
 import java.io.DataInputStream;
 import java.io.IOException;
@@ -28,23 +28,23 @@ import org.commoncrawl.io.internal.NIOClientSocket;
 import org.commoncrawl.io.internal.NIOClientSocketListener;
 import org.commoncrawl.io.internal.NIOClientTCPSocket;
 import org.commoncrawl.io.internal.NIOSocket;
-import org.commoncrawl.rpc.base.internal.AsyncClientChannel;
-import org.commoncrawl.rpc.base.internal.AsyncServerChannel;
+import org.commoncrawl.rpc.RPCChannel;
+import org.commoncrawl.rpc.RPCServerChannel;
 import org.commoncrawl.util.shared.CCStringUtils;
 
-public class ThriftAsyncClientChannel implements NIOClientSocketListener,
-Comparable<ThriftAsyncClientChannel> {
+public class ThriftRPCChannel implements NIOClientSocketListener,
+Comparable<ThriftRPCChannel> {
   
   
   public static class AsyncStub { 
     
-    private ThriftAsyncClientChannel _channel;
+    private ThriftRPCChannel _channel;
     
-    public AsyncStub(ThriftAsyncClientChannel channel) { 
+    public AsyncStub(ThriftRPCChannel channel) { 
         _channel = channel;
     }
     
-    public ThriftAsyncClientChannel getChannel() {
+    public ThriftRPCChannel getChannel() {
         return _channel;
     }
   }  
@@ -56,16 +56,16 @@ Comparable<ThriftAsyncClientChannel> {
   public static interface ConnectionCallback {
 
     /** called when the Outgoing Channel is connected **/
-    void OutgoingChannelConnected(ThriftAsyncClientChannel channel);
+    void OutgoingChannelConnected(ThriftRPCChannel channel);
 
     /**
      * called when the Channel is disconnected
      * 
      */
-    void OutgoingChannelDisconnected(ThriftAsyncClientChannel channel);
+    void OutgoingChannelDisconnected(ThriftRPCChannel channel);
   }
 
-  public static final Log                                  LOG                     = LogFactory.getLog(ThriftAsyncClientChannel.class);
+  public static final Log                                  LOG                     = LogFactory.getLog(ThriftRPCChannel.class);
 
   private static int                                       INITIAL_RECONNECT_DELAY = 1000;
   private static int                                       MAX_RECONNECT_DELAY     = 5000;
@@ -73,11 +73,11 @@ Comparable<ThriftAsyncClientChannel> {
   private EventLoop                                        _eventLoop;
   // private String _path;
   private int                                               _lastRequestId          = 0;
-  private Map<Integer, ThriftAsyncRequest<TBase, TBase>>    _requestMap             = Collections
-  .synchronizedMap(new HashMap<Integer, ThriftAsyncRequest<TBase, TBase>>());
+  private Map<Integer, ThriftOutgoingMessageContext<TBase, TBase>>    _requestMap             = Collections
+  .synchronizedMap(new HashMap<Integer, ThriftOutgoingMessageContext<TBase, TBase>>());
 
   // list of requests that were already sent
-  private LinkedList<ThriftAsyncRequest<TBase, TBase>>      _deferredSendQueue              = new LinkedList<ThriftAsyncRequest<TBase, TBase>>();
+  private LinkedList<ThriftOutgoingMessageContext<TBase, TBase>>      _deferredSendQueue              = new LinkedList<ThriftOutgoingMessageContext<TBase, TBase>>();
 
   // open for business or not
   private boolean                                          _isOpen                 = false;
@@ -100,9 +100,9 @@ Comparable<ThriftAsyncClientChannel> {
   private TProtocol                                        _outputProtocol;
 
   /** back pointer to server channel is this is an inoming client channel **/
-  AsyncServerChannel                                       _serverChannel          = null;
+  RPCServerChannel                                       _serverChannel          = null;
   /** connection callback **/
-  ConnectionCallback                                       _connectionCallback;   
+  ConnectionCallback                                     _connectionCallback;   
   
   // in the midst of reading the frame size off the wire
   private static final int READING_FRAME_SIZE = 1;
@@ -113,7 +113,7 @@ Comparable<ThriftAsyncClientChannel> {
   private int                                              _frameSize = 0;
 
   // constructor
-  public ThriftAsyncClientChannel(EventLoop client,
+  public ThriftRPCChannel(EventLoop client,
       TProtocolFactory inputProtocolFactory,
       TProtocolFactory outputProtocolFactory,
       InetSocketAddress localAddress, InetSocketAddress address,
@@ -123,7 +123,7 @@ Comparable<ThriftAsyncClientChannel> {
     _outputProtocolFactory= outputProtocolFactory;
     _outputProtocol = createOutputProtocol();
     
-    synchronized (AsyncClientChannel.class) {
+    synchronized (RPCChannel.class) {
       _channelId = ++_lastChannelId;
     }
 
@@ -247,12 +247,12 @@ Comparable<ThriftAsyncClientChannel> {
     }
   }
 
-  AsyncServerChannel getServerChannel() {
+  RPCServerChannel getServerChannel() {
     return _serverChannel;
   }
 
   @SuppressWarnings("unchecked")
-  public synchronized void sendRequest(final ThriftAsyncRequest request){
+  public synchronized void sendRequest(final ThriftOutgoingMessageContext request){
 
     if (Thread.currentThread() != getEventLoop().getEventThread()) {
       getEventLoop().queueAsyncRunnable(new Runnable() {
@@ -306,7 +306,7 @@ Comparable<ThriftAsyncClientChannel> {
     }
   }
 
-  private void encodeRequest(ThriftAsyncRequest<TBase, TBase> request) throws TException { 
+  private void encodeRequest(ThriftOutgoingMessageContext<TBase, TBase> request) throws TException { 
     // start the message output ...
     _outputProtocol.writeMessageBegin(new org.apache.thrift.protocol.TMessage(request.getMethodName(), org.apache.thrift.protocol.TMessageType.CALL, request.getRequestId()));
     // write the request parameters ... 
@@ -332,10 +332,10 @@ Comparable<ThriftAsyncClientChannel> {
     // if requests are queued up to go ... 
     if (_deferredSendQueue.size() != 0) {
       // swap out lists ....
-      LinkedList<ThriftAsyncRequest<TBase, TBase>> temp = _deferredSendQueue;
-      _deferredSendQueue = new LinkedList<ThriftAsyncRequest<TBase, TBase>>();
+      LinkedList<ThriftOutgoingMessageContext<TBase, TBase>> temp = _deferredSendQueue;
+      _deferredSendQueue = new LinkedList<ThriftOutgoingMessageContext<TBase, TBase>>();
       // and resend all messages ...
-      for (ThriftAsyncRequest<TBase, TBase> request : temp) {
+      for (ThriftOutgoingMessageContext<TBase, TBase> request : temp) {
         // resed requests 
         sendRequest(request);
       }
@@ -366,13 +366,13 @@ Comparable<ThriftAsyncClientChannel> {
 
   private synchronized void cancelOutgoingMessages() {
     // create temp list ... 
-    LinkedList<ThriftAsyncRequest<TBase, TBase>> tempList = new LinkedList<ThriftAsyncRequest<TBase, TBase>>();
+    LinkedList<ThriftOutgoingMessageContext<TBase, TBase>> tempList = new LinkedList<ThriftOutgoingMessageContext<TBase, TBase>>();
     // add all outstanding requests from map 
     tempList.addAll(_requestMap.values());
     // clear request map ... 
     _requestMap.clear();
     // iterate oustanding requests and cancel them 
-    for (ThriftAsyncRequest<TBase, TBase> request : tempList) {
+    for (ThriftOutgoingMessageContext<TBase, TBase> request : tempList) {
       request.getCallback().onError(request,new TException("Request Cancelled"));
     }
   }
@@ -529,7 +529,7 @@ Comparable<ThriftAsyncClientChannel> {
               // ok read the message header ... 
               TMessage message = _inputProtocol.readMessageBegin();
               // lookup the request id in the sent map ...
-              ThriftAsyncRequest associatedRequest = _requestMap.get(message.seqid);
+              ThriftOutgoingMessageContext associatedRequest = _requestMap.get(message.seqid);
               // ok if null .. 
               if (associatedRequest != null) { 
                 // remove it dude ... 
@@ -579,7 +579,7 @@ Comparable<ThriftAsyncClientChannel> {
   }
 
   @Override
-  public int compareTo(ThriftAsyncClientChannel o) {
+  public int compareTo(ThriftRPCChannel o) {
     long comparisonResult = this._channelId - o._channelId;
     return (comparisonResult < 0 ? -1 : (comparisonResult > 0) ? 1 : 0);
   }

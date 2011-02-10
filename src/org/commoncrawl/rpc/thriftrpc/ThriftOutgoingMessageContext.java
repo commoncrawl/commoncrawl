@@ -1,15 +1,15 @@
-package org.commoncrawl.thriftrpc;
+package org.commoncrawl.rpc.thriftrpc;
 
 import org.apache.thrift.TBase;
 import org.apache.thrift.async.AsyncMethodCallback;
 
 @SuppressWarnings("unchecked")
-public class ThriftAsyncRequest<InputArgs extends TBase,OutputArgs extends TBase> {
+public class ThriftOutgoingMessageContext<InputArgs extends TBase,OutputArgs extends TBase> {
 
   public String methodName_;
   public InputArgs args_;
   public OutputArgs result_;
-  public ThriftAsyncClientChannel channel_;
+  public ThriftRPCChannel channel_;
   public ThriftAsyncRequestCallback<InputArgs,OutputArgs> resultHandler_;
   public int requestId_;
   
@@ -22,7 +22,7 @@ public class ThriftAsyncRequest<InputArgs extends TBase,OutputArgs extends TBase
      * request.
      * @param response
      */
-    public void onComplete(ThriftAsyncRequest<InputArgs,OutputArgs> request);
+    public void onComplete(ThriftOutgoingMessageContext<InputArgs,OutputArgs> request);
 
     /**
      * This method will be called when there is an unexpected clientside
@@ -30,11 +30,11 @@ public class ThriftAsyncRequest<InputArgs extends TBase,OutputArgs extends TBase
      * appear in the IDL, but rather things like IOExceptions.
      * @param exception
      */
-    public void onError(ThriftAsyncRequest<InputArgs,OutputArgs> request,Exception exception);
+    public void onError(ThriftOutgoingMessageContext<InputArgs,OutputArgs> request,Exception exception);
     
   }
   
-  public ThriftAsyncRequest(ThriftAsyncClientChannel channel,
+  public ThriftOutgoingMessageContext(ThriftRPCChannel channel,
       ThriftAsyncRequestCallback<InputArgs,OutputArgs> resultHandler,final String methodName,InputArgs args,
       OutputArgs result) {
     

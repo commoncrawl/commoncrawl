@@ -1,4 +1,4 @@
-package org.commoncrawl.thriftrpc;
+package org.commoncrawl.rpc.thriftrpc;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -27,7 +27,7 @@ import org.commoncrawl.util.shared.CCStringUtils;
  * reponse data back to the client. In the process it manages flipping the
  * read and write bits on the selection key for its client.
  */
-class ThriftAsyncRemoteClientChannel implements NIOClientSocketListener {
+class ThriftRPCClientChannel implements NIOClientSocketListener {
   //
   // Possible states for the ThriftAsyncRemoteClientChannel state machine.
   //
@@ -60,9 +60,9 @@ class ThriftAsyncRemoteClientChannel implements NIOClientSocketListener {
 
   private TByteArrayOutputStream response_;
   
-  ThriftAsyncServerChannel serverChannel_;
+  ThriftRPCServerChannel serverChannel_;
 
-  public ThriftAsyncRemoteClientChannel(ThriftAsyncServerChannel serverChannel_, ThriftAsyncServerChannel serverChannel,final TNonblockingTransport trans,final SelectionKey selectionKey) {
+  public ThriftRPCClientChannel(ThriftRPCServerChannel serverChannel_, ThriftRPCServerChannel serverChannel,final TNonblockingTransport trans,final SelectionKey selectionKey) {
     this.serverChannel_ = serverChannel_;
     serverChannel_ = serverChannel;
     trans_ = trans;
@@ -102,7 +102,7 @@ class ThriftAsyncRemoteClientChannel implements NIOClientSocketListener {
         // pull out the frame size as an integer.
         int frameSize = inputBuffer_.getInt(0);
         if (frameSize <= 0) {
-          ThriftAsyncServerChannel.LOG.error("Read an invalid frame size of " + frameSize
+          ThriftRPCServerChannel.LOG.error("Read an invalid frame size of " + frameSize
             + ". Are you using TFramedTransport on the client side?");
           return false;
         }
@@ -110,7 +110,7 @@ class ThriftAsyncRemoteClientChannel implements NIOClientSocketListener {
         // if this frame will always be too large for this server, log the
         // error and close the connection.
         if (frameSize > this.serverChannel_.MAX_READ_BUFFER_BYTES) {
-          ThriftAsyncServerChannel.LOG.error("Read a frame size of " + frameSize
+          ThriftRPCServerChannel.LOG.error("Read a frame size of " + frameSize
             + ", which is bigger than the maximum allowable buffer size for ALL connections.");
           return false;
         }
@@ -157,7 +157,7 @@ class ThriftAsyncRemoteClientChannel implements NIOClientSocketListener {
     }
 
     // if we fall through to this point, then the state must be invalid.
-    ThriftAsyncServerChannel.LOG.error("Read was called but state is invalid (" + state_ + ")");
+    ThriftRPCServerChannel.LOG.error("Read was called but state is invalid (" + state_ + ")");
     return false;
   }
 
@@ -184,7 +184,7 @@ class ThriftAsyncRemoteClientChannel implements NIOClientSocketListener {
           }
         }
       } catch (IOException e) {
-        ThriftAsyncServerChannel.LOG.warn("Got an IOException during write!", e);
+        ThriftRPCServerChannel.LOG.warn("Got an IOException during write!", e);
         return false;
       }
       if (outputBuffer_.available() == 0) { 
@@ -193,7 +193,7 @@ class ThriftAsyncRemoteClientChannel implements NIOClientSocketListener {
       }
       return true;
     }
-    ThriftAsyncServerChannel.LOG.error("Write was called, but state is invalid (" + state_ + ")");
+    ThriftRPCServerChannel.LOG.error("Write was called, but state is invalid (" + state_ + ")");
     return false;
   }
 
@@ -252,7 +252,7 @@ class ThriftAsyncRemoteClientChannel implements NIOClientSocketListener {
       requestSelectInterestChange();
     }
     catch (IOException e) { 
-      ThriftAsyncServerChannel.LOG.error(CCStringUtils.stringifyException(e));
+      ThriftRPCServerChannel.LOG.error(CCStringUtils.stringifyException(e));
       // ok close the underlying socket ... 
       close();
       // and bubble up the exception 
@@ -293,7 +293,7 @@ class ThriftAsyncRemoteClientChannel implements NIOClientSocketListener {
       }
       return true;
     } catch (IOException e) {
-      ThriftAsyncServerChannel.LOG.warn("Got an IOException in internalRead!", e);
+      ThriftRPCServerChannel.LOG.warn("Got an IOException in internalRead!", e);
       return false;
     }
   }
@@ -346,7 +346,7 @@ class ThriftAsyncRemoteClientChannel implements NIOClientSocketListener {
             return -1;
           }
         } catch (TException e) {
-          ThriftAsyncServerChannel.LOG.error(CCStringUtils.stringifyException(e));
+          ThriftRPCServerChannel.LOG.error(CCStringUtils.stringifyException(e));
           return -1;
         }
       }
@@ -371,7 +371,7 @@ class ThriftAsyncRemoteClientChannel implements NIOClientSocketListener {
 
   @Override
   public void Excepted(NIOSocket socket, Exception e) {
-    ThriftAsyncServerChannel.LOG.error(CCStringUtils.stringifyException(e));
+    ThriftRPCServerChannel.LOG.error(CCStringUtils.stringifyException(e));
     close();
   }
 

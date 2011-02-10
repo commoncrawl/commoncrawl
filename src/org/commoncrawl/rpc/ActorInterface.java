@@ -1,32 +1,57 @@
-package org.commoncrawl.rpc.base.internal;
+package org.commoncrawl.rpc;
 
 import java.io.IOException;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
-public interface Service {
+import org.commoncrawl.async.EventLoop;
 
-  public static class Specification {
+/** 
+ * ActorInterface - An actor responds to messages via the ActorInterface
+ * 
+ * @author rana
+ *
+ */
+public interface ActorInterface {
 
-    public Specification(String name, RequestDispatcher dispatcher) {
+  public static class RPCSpecification {
+
+    public RPCSpecification(String name, RPCMessageDispatcher dispatcher) {
       _name = name;
       _dispatcher = dispatcher;
     }
 
-    public String            _name;
-    public RequestDispatcher _dispatcher;
+    public String               _name;
+    public RPCMessageDispatcher _dispatcher;
   }
-
+  
   public static class AsyncStub {
 
-    private AsyncClientChannel _channel;
+    // channel through which this stub will 
+    // communicate with the target actor
+    private Channel _channel;
+    // optional event loop the stub is running in
+    private EventLoop _eventLoop;
 
-    public AsyncStub(AsyncClientChannel channel) {
+    public AsyncStub(Channel channel,EventLoop optionalEventLoop) {
       _channel = channel;
+      _eventLoop = optionalEventLoop;
     }
 
-    public AsyncClientChannel getChannel() {
+    /**
+     * Get the Channel this stub is using to communicate to the Actor 
+     * @return Channel
+     */
+    public Channel getChannel() {
       return _channel;
+    }
+    
+    /**
+     * Get the EventLoop this stub is running in
+     * @return EventLoop
+     */
+    public EventLoop getEventLoop() { 
+      return _eventLoop;
     }
   }
 
@@ -56,15 +81,17 @@ public interface Service {
 
     protected boolean waitForResult(CountDownLatch latch) throws IOException {
 
+      EventLoop sourceEventLoop = _asyncStub.getEventLoop();
+      
       // if called from event thread ...
-      if (Thread.currentThread() == _asyncStub.getChannel().getClient()
-          .getEventThread()) {
+      if (sourceEventLoop != null && Thread.currentThread() == 
+          sourceEventLoop.getEventThread()) {
         // pump events until timeout is reached
 
         long timeoutTime = System.currentTimeMillis() + getRPCTimeout();
 
         do {
-          _asyncStub.getChannel().getClient().waitForIO(1);
+          sourceEventLoop.waitForIO(1);
         } while (latch.getCount() == 1
             || System.currentTimeMillis() >= timeoutTime);
       } else {

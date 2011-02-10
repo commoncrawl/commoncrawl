@@ -1,4 +1,4 @@
-package org.commoncrawl.rpc.base.shared;
+package org.commoncrawl.rpc;
 
 public abstract class RPCStructWithId extends RPCStruct {
 
