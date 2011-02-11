@@ -258,17 +258,17 @@ public class RccTask extends Task {
     writer.println("import org.commoncrawl.io.internal.NIOBufferList;");
     writer.println("import org.commoncrawl.io.internal.NIOBufferListOutputStream;");
     writer.println("import org.commoncrawl.rpc.thriftrpc.*;");
-    writer.println("import org.commoncrawl.rpc.thriftrpc.ThriftAsyncRequestProcessor;");
-    writer.println("import org.commoncrawl.rpc.thriftrpc.ThriftAsyncRemoteCallContext;");
-    writer.println("import org.commoncrawl.rpc.thriftrpc.ThriftAsyncRequest;");
-    writer.println("import org.commoncrawl.rpc.thriftrpc.ThriftAsyncRemoteClientChannel;");
-    writer.println("import org.commoncrawl.rpc.thriftrpc.ThriftAsyncServerChannel;");
+    writer.println("import org.commoncrawl.rpc.thriftrpc.ThriftRPCMessageDispatcher;");
+    writer.println("import org.commoncrawl.rpc.thriftrpc.ThriftIncomingMessageContext;");
+    writer.println("import org.commoncrawl.rpc.thriftrpc.ThriftOutgoingMessageContext;");
+    writer.println("import org.commoncrawl.rpc.thriftrpc.ThriftRPCClientChannel;");
+    writer.println("import org.commoncrawl.rpc.thriftrpc.ThriftRPCServerChannel;");
     writer.println("import " + packageName + "." + className +".*;");
 
     writer.println("class " + className +"_CCAsyncSupport {");
     writer.println("");
-    writer.println("  public static class " + className + "_AsyncCallStub extends ThriftAsyncClientChannel.AsyncStub {");
-    writer.println("    public " + className+ "_AsyncCallStub(ThriftAsyncClientChannel channel) {");
+    writer.println("  public static class " + className + "_AsyncCallStub extends ThriftRPCChannel.AsyncStub {");
+    writer.println("    public " + className+ "_AsyncCallStub(ThriftRPCChannel channel) {");
     writer.println("      super(channel);");
     writer.println("    }");
     writer.println("");
@@ -298,7 +298,7 @@ public class RccTask extends Task {
           e.printStackTrace();
         }
       }
-      writer.println(",final ThriftAsyncRequest.ThriftAsyncRequestCallback<" + argsName + "," + resultName +"> resultHandler) throws org.apache.thrift.TException {");
+      writer.println(",final ThriftOutgoingMessageContext.ThriftAsyncRequestCallback<" + argsName + "," + resultName +"> resultHandler) throws org.apache.thrift.TException {");
       writer.println("      " + argsName + " args = new " + argsName +"();");
       for (TFieldIdEnum field : metadataMap.keySet()) { 
         try {
@@ -309,8 +309,8 @@ public class RccTask extends Task {
         }
       }
       writer.println("      " + resultName + " result = new " + resultName + "();");
-      writer.println("      ThriftAsyncRequest<" + argsName + "," + resultName + "> asyncCallContext = " +
-          "new ThriftAsyncRequest<"+ argsName + "," + resultName + ">(super.getChannel(),resultHandler,\""+ m.getName() + "\",args,result);");
+      writer.println("      ThriftOutgoingMessageContext<" + argsName + "," + resultName + "> asyncCallContext = " +
+          "new ThriftOutgoingMessageContext<"+ argsName + "," + resultName + ">(super.getChannel(),resultHandler,\""+ m.getName() + "\",args,result);");
       writer.println("      super.getChannel().sendRequest(asyncCallContext);");
       writer.println("    }");
     }
@@ -322,18 +322,18 @@ public class RccTask extends Task {
       String inputType = method.getName()+"_args";
       String outputType = method.getName()+"_result";
 
-      writer.println("    public void " + className +"_" + method.getName() +" (final ThriftAsyncRemoteCallContext<" + inputType + "," + outputType + "> context) throws TException;");
+      writer.println("    public void " + className +"_" + method.getName() +" (final ThriftIncomingMessageContext<" + inputType + "," + outputType + "> context) throws TException;");
     }
     writer.println("  }");
     String processClassName = className +"_RequestProcessor";
 
-    writer.println("  public static class " + processClassName +" implements ThriftAsyncRequestProcessor { ");
+    writer.println("  public static class " + processClassName +" implements ThriftRPCMessageDispatcher { ");
     writer.println("    " + baseInterfaceName + " _iface;");
     writer.println("    " + processClassName+"(" + baseInterfaceName +" iface){");
     writer.println("      _iface = iface;");
     writer.println("    }");
     writer.println("");
-    writer.println("   public void process(ThriftAsyncServerChannel serverChannel,ThriftAsyncRemoteClientChannel clientChannel,TMessage message,TProtocol iprot)throws TException {");
+    writer.println("   public void process(ThriftRPCServerChannel serverChannel,ThriftRPCClientChannel clientChannel,TMessage message,TProtocol iprot)throws TException {");
 
     for (Method method : zclass.getMethods()) {
       String inputType = method.getName()+"_args";
@@ -345,7 +345,7 @@ public class RccTask extends Task {
       writer.println("      input.read(iprot);");
       writer.println("      iprot.readMessageEnd();");
       
-      writer.println("      ThriftAsyncRemoteCallContext<" + inputType + "," + outputType +"> context = new ThriftAsyncRemoteCallContext<" + inputType + "," + outputType +">" +
+      writer.println("      ThriftIncomingMessageContext<" + inputType + "," + outputType +"> context = new ThriftIncomingMessageContext<" + inputType + "," + outputType +">" +
             "(serverChannel,clientChannel,message,iprot,input,output);");
       writer.println("      _iface." + className +"_" + method.getName() +"(context);");
       writer.println("      return;");
