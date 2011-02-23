@@ -3,6 +3,7 @@ package org.commoncrawl.server;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.Map;
 import java.util.concurrent.Semaphore;
@@ -177,22 +178,10 @@ public class WebServer {
     String logDir = System.getProperty("commoncrawl.log.dir");
 
     // set up the context for "/" jsp files
-    String webappDir = null;
+    File webappDir = null;
 
     if (hostServer.getWebAppName() != null) {
-      try {
-        webappDir = getWebAppsPath("webapps" + File.separator
-            + hostServer.getWebAppName() + "/");
-      } catch (FileNotFoundException e) {
-        // Retry. Resource may be inside jar on a windows machine.
-        webappDir = getWebAppsPath("webapps/" + hostServer.getWebAppName()
-            + "/");
-      }
-
-      URL webAppURL = null;
-      if (webappDir != null) {
-        webAppURL = new URL(webappDir);
-      }
+      webappDir = getWebAppsPath();
 
       LOG.info("WebApps Dir is:" + webappDir);
 
@@ -207,11 +196,11 @@ public class WebServer {
 
       webAppContext.setContextPath("/");
 
-      ((WebAppContext) this.webAppContext).setWar(webappDir);
+      ((WebAppContext) this.webAppContext).setWar(webappDir.getAbsolutePath());
 
       // if (webAppURL != null) {
       // set up the context for "/static/*"
-      File webAppStaticDir = new File(webAppURL.getPath(), "/static");
+      File webAppStaticDir = new File(webappDir, "/static");
 
       File files[] = webAppStaticDir.listFiles();
       boolean hasStaticFilesInRoot = false;
@@ -328,22 +317,19 @@ public class WebServer {
    * 
    * @return the pathname as a URL
    */
-  public static String getWebAppsPath() throws IOException {
-    return getWebAppsPath("webapps");
-  }
+  public File getWebAppsPath() throws IOException {
+    String webAppName = _hostServer.getWebAppName();
 
-  /**
-   * Get the pathname to the <code>patch</code> files.
-   * 
-   * @param path
-   *          Path to find.
-   * @return the pathname as a URL
-   */
-  public static String getWebAppsPath(final String path) throws IOException {
-    URL url = WebServer.class.getClassLoader().getResource(path);
+    URL url = WebServer.class.getClassLoader().getResource(webAppName);
     if (url == null)
-      throw new IOException("webapps not found in CLASSPATH");
-    return url.toExternalForm();
+      throw new IOException("webapps path not found in CLASSPATH");
+    
+    try {
+      return new File(url.toURI());
+    } catch (URISyntaxException e) {
+      LOG.error(CCStringUtils.stringifyException(e));
+      throw new IOException(e);
+    }
   }
 
   /**
