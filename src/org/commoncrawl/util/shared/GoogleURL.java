@@ -186,4 +186,9 @@ public class GoogleURL {
     public int len;    // Will be -1 if the component is unspecified.
 
   }  
+  
+  public static void main(String[] args) {
+    GoogleURL urlObject = new GoogleURL("http://www.test.co.uk/somethingelse");
+    System.out.println(urlObject.getCanonicalURL());
+  }
 }

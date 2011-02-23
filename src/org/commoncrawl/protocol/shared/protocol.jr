@@ -127,4 +127,9 @@ module org.commoncrawl.protocol.shared {
       byte    cacheControlFlags = 28;       
    }
    
+   class URLFPV2 [nodirty]  { 
+    [key] vlong domainHash = 1;
+    [key] vlong urlHash = 2;
+    vlong rootDomainHash = 3;           
+  }   
 }
