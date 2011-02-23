@@ -36,12 +36,12 @@ extern "C"  void JNICALL Java_org_commoncrawl_util_shared_GoogleURL_internal_1in
   // get the jclass for Class 
   jclass objectClass = env->FindClass("java/lang/Class");
   // get the get cannonical name method id ... 
-  jmethodID getCanonicalNameId = env->GetMethodID(objectClass,"getCanonicalName","()Ljava/lang/String;");
+  jmethodID getNameId = env->GetMethodID(objectClass,"getName","()Ljava/lang/String;");
   
-  if (getCanonicalNameId) { 
+  if (getNameId) { 
   
     // and invoke the method ... 
-    jstring theCanoncialName =(jstring) env->CallObjectMethod(googleURLComponentClazz,getCanonicalNameId);
+    jstring theCanoncialName =(jstring) env->CallObjectMethod(googleURLComponentClazz,getNameId);
     
     if (theCanoncialName != 0) { 
       
