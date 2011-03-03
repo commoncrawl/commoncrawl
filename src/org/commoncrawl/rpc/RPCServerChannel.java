@@ -51,6 +51,7 @@ public class RPCServerChannel implements NIOServerSocketListener {
     _server = server;
     _callback = callback;
   }
+  
 
   public void open() throws IOException {
     if (_state == State.CLOSED) {

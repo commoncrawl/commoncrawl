@@ -180,7 +180,7 @@ public class WebServer {
     // set up the context for "/" jsp files
     File webappDir = null;
 
-    if (hostServer.getWebAppName() != null) {
+    if (hostServer.getAppName() != null) {
       webappDir = getWebAppsPath();
 
       LOG.info("WebApps Dir is:" + webappDir);
@@ -318,7 +318,7 @@ public class WebServer {
    * @return the pathname as a URL
    */
   public File getWebAppsPath() throws IOException {
-    String webAppName = _hostServer.getWebAppName();
+    String webAppName = _hostServer.getAppName();
 
     URL url = WebServer.class.getClassLoader().getResource(webAppName);
     if (url == null)

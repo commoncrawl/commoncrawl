@@ -19,6 +19,7 @@ import java.util.regex.Pattern;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.util.StringUtils;
 import org.commoncrawl.async.EventLoop;
 import org.commoncrawl.rpc.RPCActorService;
@@ -48,6 +49,7 @@ public abstract class CommonCrawlServer extends RPCActorService {
     public String _configName;
     public String _dataDir           = null;
     public int    _dnsThreadPoolSize = -1;
+    public boolean _dumpAppName = false;
   }
 
   protected static CommonConfig            _commonConfig;
@@ -64,6 +66,8 @@ public abstract class CommonCrawlServer extends RPCActorService {
   private TreeMap<String, ExecutorService> _threadPoolMap        = new TreeMap<String, ExecutorService>();
   /** detail logging **/
   private static boolean                   _detailLoggingEnabled = false;
+  /** filesystem access **/
+  FileSystem _fileSystem    = null;
 
   public CommonCrawlServer() {
     super(null);
@@ -86,8 +90,6 @@ public abstract class CommonCrawlServer extends RPCActorService {
 
   protected abstract boolean parseArguements(String argv[]);
 
-  protected abstract String getDefaultLogFileName();
-
   protected abstract String getDefaultRPCInterface();
 
   protected abstract int getDefaultRPCPort();
@@ -96,7 +98,7 @@ public abstract class CommonCrawlServer extends RPCActorService {
 
   protected abstract int getDefaultHttpPort();
 
-  protected abstract String getWebAppName();
+  protected abstract String getAppName();
 
   protected abstract String getDefaultDataDir();
 
@@ -221,6 +223,10 @@ public abstract class CommonCrawlServer extends RPCActorService {
 
     _configuration = conf;
 
+    _fileSystem = FileSystem.get(_configuration);
+    
+    LOG.info("Hadoop FileSystem is:" + _fileSystem.getUri().toString());
+    
     if (!parseArguements(argv)) {
       printUsage();
       return false;
@@ -440,7 +446,9 @@ public abstract class CommonCrawlServer extends RPCActorService {
           boolean enabled = Boolean.parseBoolean(argv[++i]);
           _detailLoggingEnabled = enabled;
         }
-
+        else if (argv[i].equalsIgnoreCase("--dumpAppName")) { 
+          configOut._dumpAppName = true;
+        }
       }
     }
     return configOut;
@@ -463,6 +471,26 @@ public abstract class CommonCrawlServer extends RPCActorService {
 
       _commonConfig = parseCommonConfig(argv);
 
+      if (_commonConfig._dumpAppName) { 
+        if (_commonConfig._className == null) { 
+          System.out.println("");
+          return;
+        }
+        else  {
+          try { 
+            // instantiate server ... 
+            Class theClass = conf.getClassByName(_commonConfig._className);
+            Object serverInstance = theClass.newInstance();
+            CommonCrawlServer server = CommonCrawlServer.class.cast(serverInstance);
+            // write out preferred log file name 
+            System.out.println(server.getAppName());
+          }
+          catch (Exception e) { 
+            System.err.println("Failed to Instatiate Server with Error:" + CCStringUtils.stringifyException(e));
+          }
+          return;
+        }
+      }
       if (_commonConfig._className == null) {
         printCommonUsage();
         return;

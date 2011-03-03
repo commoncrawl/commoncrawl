@@ -93,7 +93,9 @@ public class RPCChannel implements NIOClientSocketListener,
   RPCServerChannel                                          _serverChannel          = null;
   /** connection callback **/
   ConnectionCallback                                       _connectionCallback;                                                                                      ;
-
+  /** context object **/
+  Object _context;
+  
   /**
    * Construct an RPCChannel that talks to a remote server 
    * 
@@ -146,7 +148,18 @@ public class RPCChannel implements NIOClientSocketListener,
     // register for an initial read on the socket ...
     _eventLoop.getSelector().registerForRead(_socket);
   }
-
+  
+  /** set a context object **/
+  public void setContext(Object contextObj) { 
+    _context = contextObj;
+  }
+  
+  /** get the context object **/
+  public Object getContext() { 
+    return _context;
+  }
+  
+  
   public synchronized void open() throws IOException {
     if (!_isOpen) {
       _isOpen = true;

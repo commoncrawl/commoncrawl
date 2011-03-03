@@ -413,6 +413,6 @@ public abstract class InProcessActor {
    * @param message
    * @throws RPCException
    */
-  abstract void dispatch(final Channel channel, final IncomingMessage message) throws RPCException; 
+  abstract public void dispatch(final Channel channel, final IncomingMessage message) throws RPCException; 
   
 }

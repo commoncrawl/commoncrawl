@@ -246,6 +246,7 @@ public class JService {
         + "messagePayload,int requestId,Channel channel) throws RPCException {\n\n");
 
     // generate dispatcher code per supported method ...
+    int methodCount = 0;
     for (JMethod method : _methods) {
 
       JRecord.JavaRecord inputType = (method.getInputType() != null) ? (JRecord.JavaRecord) method
@@ -263,7 +264,11 @@ public class JService {
       String contextSpec = "IncomingMessageContext<" + inputFullSpec + ","
           + outputFullSpec + ">";
 
-      cb.append("if (methodName.equals(\"" + method.getName() + "\")){\n");
+      if (methodCount++ ==0)
+        cb.append("if ");
+      else 
+        cb.append("else if ");
+      cb.append("(methodName.equals(\"" + method.getName() + "\")){\n");
 
       if (inputType != null) {
         cb.append(inputFullSpec + " input = new " + inputFullSpec + "();\n");
@@ -313,7 +318,7 @@ public class JService {
     cb.append("    InProcessActor actor = new InProcessActor(executor,optionalListener) {\n\n");
     cb.append("          @SuppressWarnings(\"unchecked\")\n");
     cb.append("      @Override\n");
-    cb.append("      void dispatch(Channel channel, IncomingMessage message)throws RPCException {\n");
+    cb.append("      public void dispatch(Channel channel, IncomingMessage message)throws RPCException {\n");
     cb.append("        if (message.getServiceName().equals(spec._name)) {\n");
     for (JMethod method : _methods) {
       cb.append("        if (message.getMethodName().equals(\""+ method.getName() +"\")){\n");
