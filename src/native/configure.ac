@@ -98,7 +98,7 @@ AC_C_CONST
 AC_CHECK_FUNCS([memset])
 
 AC_CONFIG_FILES([Makefile
-		 src/libGoogleURL/Makefile src/libNodeJS/Makefile
+		 src/libGoogleURL/Makefile
                  ])
 AC_OUTPUT
 
