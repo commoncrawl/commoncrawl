@@ -36,7 +36,7 @@
 export PLATFORM = $(shell echo $$OS_NAME | tr [A-Z] [a-z])
 
 # List the sub-directories here
-SUBDIRS = src/libGoogleURL src/libNodeJS
+SUBDIRS = src/libGoogleURL
 # The following export is needed to build libhadoop.so in the 'lib' directory
 export SUBDIRS
 
