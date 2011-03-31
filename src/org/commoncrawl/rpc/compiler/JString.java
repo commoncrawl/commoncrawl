@@ -31,7 +31,7 @@ public class JString extends JCompType {
     @Override
     void genClone(CodeBuffer cb, String type, String targetField,
         String sourceField) {
-      cb.append(targetField + "= new TextBytes(" + sourceField + ");\n");
+      cb.append(targetField + "= (TextBytes)" + sourceField + ".clone();\n");
     }
 
     @Override

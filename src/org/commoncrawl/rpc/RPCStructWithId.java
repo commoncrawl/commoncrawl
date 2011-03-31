@@ -1,6 +1,6 @@
 package org.commoncrawl.rpc;
 
-public abstract class RPCStructWithId extends RPCStruct {
+public abstract class RPCStructWithId<ConcreteType> extends RPCStruct<ConcreteType> {
 
   private long _recordId;
 

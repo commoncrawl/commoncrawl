@@ -20,7 +20,7 @@ import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
 
-public abstract class RPCStruct implements Cloneable {
+public abstract class RPCStruct<ConcreteType> implements Cloneable {
 
   static protected final String emptyString = new String();
 
@@ -38,7 +38,7 @@ public abstract class RPCStruct implements Cloneable {
    * 
    * @throws CloneNotSupportedException
    */
-  public abstract void merge(Object peer) throws CloneNotSupportedException;
+  public abstract void merge(ConcreteType peer) throws CloneNotSupportedException;
 
   /**
    * Serialize to the given output stream using the given protocol encoder

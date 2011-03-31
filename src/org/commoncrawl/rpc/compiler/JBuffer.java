@@ -58,16 +58,23 @@ public class JBuffer extends JCompType {
       cb.append("this." + fname + "=" + fname + ";\n");
       cb.append("}\n");
       cb.append("public void set" + toCamelCase(fname) + "( Buffer " + fname
-          + ") {\n");
+          + ",boolean shared) {\n");
       if (trackDirtyFields) {
         cb.append("__validFields.set(Field_" + fname.toUpperCase() + ");\n");
       }
       cb.append("this." + fname + "= new FlexBuffer(" + fname + ".get(),0,"
-          + fname + ".getCount());\n");
+          + fname + ".getCount(),shared);\n");
       cb.append("}\n");
 
     }
 
+    @Override
+    void genReadMethod(CodeBuffer cb, String fname, String tag, boolean decl) {
+      if (decl) {
+        cb.append(getType() + " " + fname + " = new FlexBuffer();\n");
+      }
+      cb.append("decoder.read" + getMethodSuffix() + "(input," + fname+ ");\n");    
+    }
   }
 
   /** Creates a new instance of JBuffer */

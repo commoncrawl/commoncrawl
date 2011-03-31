@@ -108,18 +108,17 @@ public final class BinaryProtocol {
   }
 
   // @Override
-  public FlexBuffer readFlexBuffer(DataInput in) throws IOException {
-    FlexBuffer buffer = null;
-
+  public void readFlexBuffer(DataInput in,FlexBuffer buffer) throws IOException {
     int length = in.readInt();
-    if (length != 0) {
-      byte[] data = new byte[length];
-      in.readFully(data);
-      buffer = new FlexBuffer(data, 0, data.length);
-    } else {
-      buffer = new FlexBuffer();
+    // set buffer's count to zero first ... 
+    buffer.setCount(0);
+    if (length != 0) { 
+      // now reinit count to proper length ... 
+      // this prevents the buffer from copying old data to newly 
+      // allocated buffer if capacity < count
+      buffer.setCount(length);
+      in.readFully(buffer.get(),buffer.getOffset(),buffer.getCount());
     }
-    return buffer;
   }
 
   // @Override

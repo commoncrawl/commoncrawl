@@ -804,7 +804,7 @@ public final class ArcFileReader extends InflaterInputStream implements
               .error("ArcFileBuilder Encountered Item with Zero Length Content. URI:"
                   + _item.getUri());
         } else {
-          _item.setContent(_buffer);
+          _item.setContent(_buffer,false);
           _buffer = new Buffer();
         }
         _item = null;

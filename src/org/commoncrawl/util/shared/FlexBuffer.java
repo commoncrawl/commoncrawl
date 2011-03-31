@@ -36,13 +36,13 @@ import org.apache.hadoop.io.WritableUtils;
  */
 public final class FlexBuffer implements WritableComparable, Cloneable {
   /** Number of valid bytes in this.bytes. */
-  private int     count;
+  int     count;
   /** Backing store for Buffer. */
-  private byte[]  zbytes    = null;
+  byte[]  zbytes    = null;
   /** offset - optional **/
-  private int     offset    = 0;
+  int     offset    = 0;
   /** shared backing array or not **/
-  private boolean _isShared = false;
+  boolean _isShared = false;
 
   /**
    * Create a zero-count sequence.
@@ -59,12 +59,12 @@ public final class FlexBuffer implements WritableComparable, Cloneable {
     return _isShared;
   }
 
-  public FlexBuffer(FlexBuffer other) {
+  public FlexBuffer(FlexBuffer other,boolean shared) {
     count = other.count;
     zbytes = other.zbytes;
     offset = other.offset;
     // mark our buffer as shared
-    _isShared = true;
+    _isShared = shared;
     // and mark source as shared
     other._isShared = true;
   }
@@ -75,8 +75,8 @@ public final class FlexBuffer implements WritableComparable, Cloneable {
    * @param bytes
    *          This array becomes the backing storage for the object.
    */
-  public FlexBuffer(byte[] bytes) {
-    set(bytes);
+  public FlexBuffer(byte[] bytes,boolean shared) {
+    set(bytes,shared);
   }
 
   /**
@@ -89,8 +89,8 @@ public final class FlexBuffer implements WritableComparable, Cloneable {
    * @param length
    *          length of data
    */
-  public FlexBuffer(byte[] bytes, int offset, int length) {
-    set(bytes, offset, length);
+  public FlexBuffer(byte[] bytes, int offset, int length,boolean shared) {
+    set(bytes, offset, length,shared);
   }
 
   /**
@@ -99,23 +99,26 @@ public final class FlexBuffer implements WritableComparable, Cloneable {
    * @param bytes
    *          byte sequence
    */
-  public void set(byte[] bytes) {
+  public void set(byte[] bytes,boolean shared) {
     this.count = (bytes == null) ? 0 : bytes.length;
     this.zbytes = bytes;
     this.offset = 0;
     this._isShared = true;
   }
 
+  
   /**
    * Use the specified bytes array as underlying sequence.
    * 
    */
+  /*
   public void set(byte[] bytes, int offset, int length) {
     this.count = length;
     this.zbytes = bytes;
     this.offset = offset;
     this._isShared = true;
   }
+  */
 
   /**
    * Use the specified bytes array as underlying sequence.
@@ -369,6 +372,9 @@ public final class FlexBuffer implements WritableComparable, Cloneable {
   @Override
   public void readFields(DataInput in) throws IOException {
     int byteCount = WritableUtils.readVInt(in);
+    // first zero count ... 
+    setCount(0);
+    // then set count 
     setCount(byteCount);
     if (byteCount != 0) {
       // allocate new backing store if shared

@@ -9,7 +9,7 @@ public class MD5Signature {
 
     if (content.getCount() != 0) {
       signature.set(MD5Hash.digest(content.get(), content.getOffset(),
-          content.getCount()).getDigest());
+          content.getCount()).getDigest(),true);
     }
     return signature;
   }

@@ -48,7 +48,7 @@ import org.apache.hadoop.io.WritableUtils;
  * 
  */
 public final class TextBytes extends BinaryComparable implements
-    WritableComparable<BinaryComparable> {
+    WritableComparable<BinaryComparable>,Cloneable {
 
   private static final Log                   LOG             = LogFactory
                                                                  .getLog(TextBytes.class);
@@ -97,21 +97,21 @@ public final class TextBytes extends BinaryComparable implements
   }
 
   /** Construct from another textbytes. */
-  public TextBytes(TextBytes utf8) {
-    bytes = new FlexBuffer(utf8.bytes);
+  public TextBytes(TextBytes utf8,boolean shared) {
+    bytes = new FlexBuffer(utf8.bytes,shared);
     cachedUTF8 = utf8.cachedUTF8;
   }
 
   /** Construct from another text. */
-  public TextBytes(Text utf8) {
-    set(utf8);
+  public TextBytes(Text utf8,boolean shared) {
+    set(utf8,shared);
   }
 
   /**
    * Construct from a byte array.
    */
-  public TextBytes(byte[] utf8) {
-    set(utf8);
+  public TextBytes(byte[] utf8,boolean shared) {
+    set(utf8,shared);
   }
 
   /**
@@ -144,6 +144,7 @@ public final class TextBytes extends BinaryComparable implements
       setCapacity(newLength, true);
     }
     bytes.setCount(newLength);
+    cachedUTF8 = null;
   }
 
   /**
@@ -224,7 +225,7 @@ public final class TextBytes extends BinaryComparable implements
   public void set(String string) {
     try {
       ByteBuffer bb = encode(string, true);
-      set(bb.array(), 0, bb.limit());
+      set(bb.array(), 0, bb.limit(),false);
       cachedUTF8 = string;
       // zbytes = bb.array();
       // length = bb.limit();
@@ -237,18 +238,18 @@ public final class TextBytes extends BinaryComparable implements
   /**
    * Set to a utf8 byte array
    */
-  public void set(byte[] utf8) {
-    set(utf8, 0, utf8.length);
+  public void set(byte[] utf8,boolean shared) {
+    set(utf8, 0, utf8.length,shared);
   }
 
   /** copy a text. */
-  public void set(Text other) {
-    set(other.getBytes(), 0, other.getLength());
+  public void set(Text other,boolean shared) {
+    set(other.getBytes(), 0, other.getLength(),shared);
   }
 
   /** copy a textbytes. */
-  public void set(TextBytes other) {
-    set(other.getBytes(), 0, other.getLength());
+  public void set(TextBytes other,boolean shared) {
+    set(other.getBytes(), 0, other.getLength(),shared);
   }
 
   /**
@@ -261,8 +262,8 @@ public final class TextBytes extends BinaryComparable implements
    * @param len
    *          the number of bytes of the new string
    */
-  public void set(byte[] utf8, int start, int len) {
-    bytes.set(utf8, start, len);
+  public void set(byte[] utf8, int start, int len,boolean shared) {
+    bytes.set(utf8, start, len,shared);
     // reset string cache ...
     cachedUTF8 = null;
   }
@@ -307,9 +308,17 @@ public final class TextBytes extends BinaryComparable implements
    */
   private void setCapacity(int len, boolean keepData) {
     if (!keepData) {
+      // ok turn off copy on write here ...
+      // because setCapacity below will take of this ... 
+      boolean oldSharedValue = bytes._isShared;
+      bytes._isShared = false;
       bytes.setCount(0);
+      bytes._isShared = oldSharedValue;
+      
     }
+    
     bytes.setCapacity(len);
+    cachedUTF8 = null;
   }
 
   private int getCapacity() {
@@ -720,7 +729,7 @@ public final class TextBytes extends BinaryComparable implements
     // now allocate a TextBytes
     TextBytes textBytes = new TextBytes();
     // set the overallocated buffer as the backing store
-    textBytes.set(overAllocated, bytes.length, bytes.length);
+    textBytes.set(overAllocated, bytes.length, bytes.length,false);
     // convert it to string first
     String toString = textBytes.toString();
     // validate equal to original
@@ -756,4 +765,11 @@ public final class TextBytes extends BinaryComparable implements
 
   }
 
+  @Override
+  public Object clone() throws CloneNotSupportedException {
+    TextBytes result = new TextBytes();
+    result.bytes.copy(this.bytes.get(), this.bytes.getOffset(), this.bytes.getCount());
+    result.cachedUTF8 = this.cachedUTF8;
+    return result;
+  }
 }

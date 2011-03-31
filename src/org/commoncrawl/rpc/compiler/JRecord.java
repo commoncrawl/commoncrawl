@@ -35,6 +35,7 @@ public class JRecord extends JCompType {
     public static int HAS_RECORDID          = 1 << 0;
     public static int HAS_NO_DIRTY_TRACKING = 1 << 1;
     public static int IS_ANONYMOUS_RECORD   = 1 << 2;
+    public static int IS_RAW                = 1 << 3;
   }
 
   private String                      fullyQualifiedName;
@@ -64,9 +65,13 @@ public class JRecord extends JCompType {
     }
 
     private boolean trackDirtyFields() {
-      return (modifiers & Modifiers.HAS_NO_DIRTY_TRACKING) == 0;
+      return (modifiers & (Modifiers.HAS_NO_DIRTY_TRACKING | Modifiers.IS_RAW)) == 0;
     }
 
+    private boolean serializeRaw() {
+      return (modifiers & Modifiers.IS_RAW) != 0;
+    }
+    
     public String getFullName() {
       return fullName;
     }
@@ -135,10 +140,11 @@ public class JRecord extends JCompType {
       cb.append("// Generated File: " + name + "\n");
       cb.append("public class " + name);
       if ((modifiers & Modifiers.HAS_RECORDID) != 0) {
-        cb.append(" extends org.commoncrawl.rpc.RPCStructWithId ");
+        cb.append(" extends org.commoncrawl.rpc.RPCStructWithId");
       } else {
-        cb.append(" extends org.commoncrawl.rpc.RPCStruct ");
+        cb.append(" extends org.commoncrawl.rpc.RPCStruct");
       }
+      cb.append("<" + name +"> ");
 
       // if the field has no key then implement Writable only
       if (this.getKeyCount() == 0) {
@@ -266,8 +272,7 @@ public class JRecord extends JCompType {
 
       cb.append("// Field Declarations\n");
       if (trackDirtyFields()) {
-        cb
-            .append("private BitSet __validFields = new BitSet(FieldID_MAX+1);\n\n");
+        cb.append("private BitSet __validFields = new BitSet(FieldID_MAX+1);\n\n");
       }
       // TODO: FIX FIELD DECLARATIONS AS NECESSARY
       for (Iterator<JField<JavaType>> i = fields.iterator(); i.hasNext();) {
@@ -343,8 +348,9 @@ public class JRecord extends JCompType {
       cb.append("public final void serialize("
           + "DataOutput output,BinaryProtocol encoder)\n"
           + "throws java.io.IOException {\n");
-
-      cb.append("encoder.beginFields(output);\n");
+      if (!serializeRaw()) {
+        cb.append("encoder.beginFields(output);\n");
+      }
       for (Iterator<JField<JavaType>> i = fields.iterator(); i.hasNext();) {
         JField<JavaType> jf = i.next();
         if ((jf.getModifiers() & JField.Modifiers.TRANSIENT) == 0) {
@@ -368,8 +374,9 @@ public class JRecord extends JCompType {
             // modify source object's dirty flags
             cb.append("__validFields.set(Field_" + name.toUpperCase() + ");\n");
           }
-          cb.append("encoder.beginField(output,\"" + name + "\",Field_"
-              + name.toUpperCase() + ");\n");
+          if (!serializeRaw()) { 
+            cb.append("encoder.beginField(output,\"" + name + "\",Field_"+ name.toUpperCase() + ");\n");
+          }
           type.genWriteMethod(cb, name, name);
           // cb.append("encoder.endField(output,\""+name+"\",Field_"+name.toUpperCase()+");\n");
           cb.append("}\n");
@@ -384,8 +391,9 @@ public class JRecord extends JCompType {
           }
         }
       }
-
-      cb.append("encoder.endFields(output);\n");
+      if (!serializeRaw()) {
+        cb.append("encoder.endFields(output);\n");
+      }
 
       cb.append("}\n");
 
@@ -394,37 +402,56 @@ public class JRecord extends JCompType {
       cb.append("public final void deserialize("
           + "DataInput input, BinaryProtocol decoder)\n"
           + "throws java.io.IOException {\n");
-      cb.append("// clear existing data first  \n");
-      cb.append("clear();\n\n");
-      cb
-          .append("// reset protocol object to unknown field id enconding mode (for compatibility)\n");
-      cb
-          .append("decoder.pushFieldIdEncodingMode(BinaryProtocol.FIELD_ID_ENCODING_MODE_UNKNOWN);\n");
-      cb.append("// keep reading fields until terminator (-1) is located \n");
-      cb.append("int fieldId;\n");
-      cb.append("while ((fieldId = decoder.readFieldId(input)) != -1) { \n");
-
-      cb.append("switch (fieldId) { \n");
-      for (Iterator<JField<JavaType>> i = fields.iterator(); i.hasNext();) {
-        JField<JavaType> jf = i.next();
-        if ((jf.getModifiers() & JField.Modifiers.TRANSIENT) == 0) {
-          String name = jf.getName();
-          JavaType type = jf.getType();
-          cb.append("case Field_" + name.toUpperCase() + ":{\n");
-          if (trackDirtyFields()) {
-            cb.append("__validFields.set(Field_" + name.toUpperCase() + ");\n");
+      // if raw serialization ... skip clear and data driven deserialize 
+      if (serializeRaw()) {
+        // iterate fields ... 
+        for (Iterator<JField<JavaType>> i = fields.iterator(); i.hasNext();) {
+          JField<JavaType> jf = i.next();
+          // if the field is NOT TRANSIENT ... 
+          if ((jf.getModifiers() & JField.Modifiers.TRANSIENT) == 0) {
+            
+            // get name and type ... 
+            String name = jf.getName();
+            JavaType type = jf.getType();
+            cb.append("{\n");
+            type.genReadMethod(cb, name, name, false);
+            cb.append("}\n");
           }
-          type.genReadMethod(cb, name, name, false);
-          cb.append("}\n");
-          cb.append("break;\n");
         }
       }
-
-      cb.append("}\n");
-      cb.append("}\n");
-
-      cb.append("// pop extra encoding mode off of stack \n");
-      cb.append("decoder.popFieldIdEncodingMode();\n");
+      else { 
+        cb.append("// clear existing data first  \n");
+        cb.append("clear();\n\n");
+        cb
+            .append("// reset protocol object to unknown field id enconding mode (for compatibility)\n");
+        cb
+            .append("decoder.pushFieldIdEncodingMode(BinaryProtocol.FIELD_ID_ENCODING_MODE_UNKNOWN);\n");
+        cb.append("// keep reading fields until terminator (-1) is located \n");
+        cb.append("int fieldId;\n");
+        cb.append("while ((fieldId = decoder.readFieldId(input)) != -1) { \n");
+  
+        cb.append("switch (fieldId) { \n");
+        for (Iterator<JField<JavaType>> i = fields.iterator(); i.hasNext();) {
+          JField<JavaType> jf = i.next();
+          if ((jf.getModifiers() & JField.Modifiers.TRANSIENT) == 0) {
+            String name = jf.getName();
+            JavaType type = jf.getType();
+            cb.append("case Field_" + name.toUpperCase() + ":{\n");
+            if (trackDirtyFields()) {
+              cb.append("__validFields.set(Field_" + name.toUpperCase() + ");\n");
+            }
+            type.genReadMethod(cb, name, name, false);
+            cb.append("}\n");
+            cb.append("break;\n");
+          }
+        }
+  
+        cb.append("}\n");
+        cb.append("}\n");
+  
+        cb.append("// pop extra encoding mode off of stack \n");
+        cb.append("decoder.popFieldIdEncodingMode();\n");
+      }
 
       cb.append("}\n");
 
@@ -515,8 +542,7 @@ public class JRecord extends JCompType {
       cb.append("// merge implementation \n");
       cb.append("@SuppressWarnings(\"unchecked\")\n");
       cb
-          .append("public final void merge(Object peer_) throws CloneNotSupportedException  {\n");
-      cb.append(name + " peer = (" + name + ") peer_;\n");
+          .append("public final void merge(" + name +" peer) throws CloneNotSupportedException  {\n");
       if (trackDirtyFields()) {
         cb.append("__validFields.or(peer.__validFields);\n");
       }
@@ -630,7 +656,10 @@ public class JRecord extends JCompType {
           modifiers |= Modifiers.HAS_NO_DIRTY_TRACKING;
         } else if (modifier.equals("anonymous")) {
           modifiers |= Modifiers.IS_ANONYMOUS_RECORD;
-        } else {
+        } else if (modifier.equals("raw")) { 
+          modifiers |= Modifiers.IS_RAW;
+        }
+        else {
           throw new Error("Invalid Record Modifier token:" + modifier
               + " encountered while parsing Record:" + fullyQualifiedName);
         }
