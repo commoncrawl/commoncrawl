@@ -101,6 +101,22 @@ public final class TextBytes extends BinaryComparable implements
     bytes = new FlexBuffer(utf8.bytes,shared);
     cachedUTF8 = utf8.cachedUTF8;
   }
+  
+  /** 
+   * construct from a existing FlexBuffer 
+   * 
+   * @param buffer
+   * @param shared
+   */
+  public TextBytes(FlexBuffer utf8Data,boolean shared) {
+    if (shared) {
+      bytes = utf8Data;
+    }
+    else { 
+      bytes = new FlexBuffer(utf8Data,false);
+    }
+    cachedUTF8 = null;
+  }
 
   /** Construct from another text. */
   public TextBytes(Text utf8,boolean shared) {

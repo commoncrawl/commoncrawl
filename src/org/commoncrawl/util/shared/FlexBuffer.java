@@ -342,7 +342,7 @@ public final class FlexBuffer implements WritableComparable, Cloneable {
 
   // inherit javadoc
   public Object clone() throws CloneNotSupportedException {
-    FlexBuffer result = (FlexBuffer) super.clone();
+    FlexBuffer result = new FlexBuffer();
     result.copy(this.get(), offset, this.getCount());
     return result;
   }

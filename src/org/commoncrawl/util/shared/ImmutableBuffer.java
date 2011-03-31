@@ -46,6 +46,17 @@ public class ImmutableBuffer {
   }
 
   /**
+   * Get a FlexBuffer representing the contents of this 
+   * buffer. The returned buffer should not be used to 
+   * modify the contents of the underlying storage
+   * 
+   * @return
+   */
+  public FlexBuffer getReadOnlyFlexBuffer() { 
+    return new FlexBuffer(_sourceBuffer,true);
+  }
+  
+  /**
    * offset
    */
   public int getOffset() {
