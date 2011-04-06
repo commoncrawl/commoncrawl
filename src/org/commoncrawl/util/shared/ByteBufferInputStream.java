@@ -4,13 +4,15 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
 
+import org.apache.hadoop.fs.FSInputStream;
+
 /**
  * Helper class that wraps a ByteBuffer as an InputStream
  * 
  * @author rana
  * 
  */
-public class ByteBufferInputStream extends InputStream {
+public class ByteBufferInputStream extends FSInputStream {
 
   ByteBuffer _source;
 
@@ -46,5 +48,22 @@ public class ByteBufferInputStream extends InputStream {
       _source.get(bytes, off, len);
       return len;
     }
+  }
+
+  @Override
+  public long getPos() throws IOException {
+    return _source.position();
+  }
+
+  @Override
+  public void seek(long pos) throws IOException {
+    _source.position((int)pos);
+    
+  }
+
+  @Override
+  public boolean seekToNewSource(long targetPos) throws IOException {
+    seek(targetPos);
+    return false;
   }
 }

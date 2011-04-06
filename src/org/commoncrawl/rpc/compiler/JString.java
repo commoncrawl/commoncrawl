@@ -62,7 +62,7 @@ public class JString extends JCompType {
     }
 
     @Override
-    void genGetSet(CodeBuffer cb, String fname, boolean trackDirtyFields) {
+    void genGetSet(CodeBuffer cb, String enclosingClassName,String fname, boolean trackDirtyFields) {
       cb.append("public TextBytes get" + toCamelCase(fname)
           + "AsTextBytes() {\n");
       cb.append("return " + fname + ";\n");
@@ -71,12 +71,13 @@ public class JString extends JCompType {
       cb.append("public String get" + toCamelCase(fname) + "() {\n");
       cb.append("return " + fname + ".toString();\n");
       cb.append("}\n");
-      cb.append("public void set" + toCamelCase(fname) + "( String " + fname
+      cb.append("public " + enclosingClassName +  "  set" + toCamelCase(fname) + "( String " + fname
           + ") {\n");
       if (trackDirtyFields) {
         cb.append("__validFields.set(Field_" + fname.toUpperCase() + ");\n");
       }
       cb.append("this." + fname + ".set(" + fname + ");\n");
+      cb.append("return this;\n");
       cb.append("}\n");
     }
   }

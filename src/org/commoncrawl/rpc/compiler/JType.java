@@ -61,16 +61,17 @@ abstract public class JType {
       cb.append("final " + name + " " + fname);
     }
 
-    void genGetSet(CodeBuffer cb, String fname, boolean trackDirtyFields) {
+    void genGetSet(CodeBuffer cb,String enclosingClass, String fname, boolean trackDirtyFields) {
       cb.append("public " + name + " get" + toCamelCase(fname) + "() {\n");
       cb.append("return " + fname + ";\n");
       cb.append("}\n");
-      cb.append("public void set" + toCamelCase(fname) + "( " + name + " "
+      cb.append("public " + enclosingClass + " set" + toCamelCase(fname) + "( " + name + " "
           + fname + ") {\n");
       if (trackDirtyFields) {
         cb.append("__validFields.set(Field_" + fname.toUpperCase() + ");\n");
       }
       cb.append("this." + fname + "=" + fname + ";\n");
+      cb.append("return this;\n");
       cb.append("}\n");
     }
 

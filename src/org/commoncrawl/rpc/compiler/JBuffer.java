@@ -46,24 +46,27 @@ public class JBuffer extends JCompType {
       cb.append(fname + ".reset();\n");
     }
 
-    void genGetSet(CodeBuffer cb, String fname, boolean trackDirtyFields) {
+    @Override
+    void genGetSet(CodeBuffer cb,String className, String fname, boolean trackDirtyFields) {
       cb.append("public ImmutableBuffer get" + toCamelCase(fname) + "() {\n");
       cb.append("return new ImmutableBuffer(" + fname + ");\n");
       cb.append("}\n");
-      cb.append("public void set" + toCamelCase(fname) + "( " + getType() + " "
+      cb.append("public "+className+" set" + toCamelCase(fname) + "( " + getType() + " "
           + fname + ") {\n");
       if (trackDirtyFields) {
         cb.append("__validFields.set(Field_" + fname.toUpperCase() + ");\n");
       }
       cb.append("this." + fname + "=" + fname + ";\n");
+      cb.append("return this;\n");
       cb.append("}\n");
-      cb.append("public void set" + toCamelCase(fname) + "( Buffer " + fname
+      cb.append("public " +className +" set" + toCamelCase(fname) + "( Buffer " + fname
           + ",boolean shared) {\n");
       if (trackDirtyFields) {
         cb.append("__validFields.set(Field_" + fname.toUpperCase() + ");\n");
       }
       cb.append("this." + fname + "= new FlexBuffer(" + fname + ".get(),0,"
           + fname + ".getCount(),shared);\n");
+      cb.append("return this;\n");
       cb.append("}\n");
 
     }

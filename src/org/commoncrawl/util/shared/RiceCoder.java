@@ -6,6 +6,12 @@ import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.zip.GZIPOutputStream;
 
+import junit.framework.Assert;
+
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.fs.FSDataInputStream;
+import org.apache.hadoop.fs.FSInputStream;
 import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.hadoop.io.WritableUtils;
 
@@ -18,6 +24,8 @@ import org.apache.hadoop.io.WritableUtils;
  */
 public class RiceCoder {
 
+  static final Log LOG = LogFactory.getLog(RiceCoder.class);  
+  
   private int size; // number of items stored
 
   private int nbits;  // number of bits to store the items
@@ -192,6 +200,10 @@ public class RiceCoder {
     private int nbits;
     private ByteBuffer bits;
     private boolean usesSignedEncoding = false;
+    private FSDataInputStream stream; 
+    private long dataOffset;
+    private int  currByte;
+    private int  currByteNo = -1;
     
     public RiceCodeReader(int mValue,int totalBits,ByteBuffer array,boolean usesSignedEncoding) { 
       this.m = mValue;
@@ -200,53 +212,68 @@ public class RiceCoder {
       this.currbit = 0;
       this.usesSignedEncoding = usesSignedEncoding;
     }
+
+    public RiceCodeReader(int mValue,int totalBits,FSDataInputStream stream,long dataOffset,boolean usesSignedEncoding) { 
+      this.m = mValue;
+      this.nbits = totalBits;
+      this.bits = null;
+      this.currbit = 0;
+      this.usesSignedEncoding = usesSignedEncoding;
+      this.stream = stream;
+      this.dataOffset = dataOffset;
+     
+    }
+    
+    public void close() { 
+      if (stream != null) { 
+        try {
+          stream.close();
+        } catch (IOException e) {
+          LOG.error(CCStringUtils.stringifyException(e));
+        }
+        stream = null;
+      }
+    }
     
     public boolean hasNext() { 
       return currbit < nbits;
     }
 
-    public int getbit() { 
+    public int getbit()throws IOException { 
       return getbit(currbit++);      
     }
     
     // get the value of the n-th bit
-    private int getbit(int bitNo) {
-      return (bits.get((bitNo >> 3)) >> (bitNo & 0x7)) & 0x1;        
+    private int getbit(int bitNo)throws IOException {
+      if (stream == null) { 
+        return (bits.get((bitNo >> 3)) >> (bitNo & 0x7)) & 0x1;
+      }
+      else { 
+        int byteNo = bitNo >> 3;
+        if (currByteNo != byteNo) {
+          stream.seek(dataOffset + byteNo);
+          currByte = stream.read();
+          currByteNo = byteNo;
+        }
+        return (currByte >> (bitNo & 0x7)) & 0x1;
+      }
     }
     
-    public long nextValue() { 
+    public long nextValue() throws IOException { 
       int  isNegative = 0;
       long unary = 0;
 
       if (usesSignedEncoding) { 
         isNegative = getbit(currbit++);
       }
-      
-      int currByte    = bits.get((currbit >> 3));
-      
-      while (((currByte >> (currbit & 0x7)) & 0x1) != 0) {
+      while (getbit(currbit++) != 0) {      
         unary++;
-        if ((currbit & 0x7) == 0x7) { 
-          currByte  = bits.get(((currbit + 1) >> 3));
-        }
-        currbit++;
       }
-
-      currbit++;
-
-      currByte = bits.get(currbit >> 3);
       
       long binary = 0;
       for (int j = 1; j <= m;) {
-        binary = (binary << 1) | ((currByte >> (currbit & 0x7)) & 0x1);
-        
+        binary = (binary << 1) | getbit(currbit++);
         j++;
-        if (j <= m) {
-          if ((currbit & 0x7) == 0x7) { 
-            currByte    = bits.get(((currbit + 1) >> 3));
-          }
-        }
-        currbit++;
       }
       
       if (isNegative == 1) {
@@ -272,98 +299,41 @@ public class RiceCoder {
     test.addItem(Long.MAX_VALUE - 1);
     test.addItem(Long.MIN_VALUE + 1);
     test.addItem(Long.MIN_VALUE);
-    RiceCodeReader testReader = new RiceCodeReader(54,test.nbits,ByteBuffer.wrap(test.bits),true); 
-    System.out.println(testReader.nextValue());
-    System.out.println(testReader.nextValue());
-    System.out.println(testReader.nextValue());
-    System.out.println(testReader.nextValue());
-    System.out.println(testReader.nextValue());
-    System.out.println(testReader.nextValue());
-    System.out.println(testReader.nextValue());
     
-    long fps[] = new long[1000];
-    for (int i=0;i<1000;++i) { 
-      fps[i] = FPGenerator.std64.fp("test" + i);
-    }
-    Arrays.sort(fps);
+    RiceCodeReader testReader = new RiceCodeReader(54,test.nbits,ByteBuffer.wrap(test.bits),true);
     
-    // compute m
-    double cumilative = 0.0;
-    for (int i=0;i<fps.length;++i) { 
-      cumilative += fps[i];
-    }
-    double avgDelta = cumilative / (double)fps.length;
-    System.out.println("Delta is:" + avgDelta);
-    int mForFingerprints =  (int) Math.floor(lg(avgDelta));
-    System.out.println("Delta is:" + mForFingerprints);
-    RiceCoder coding = new RiceCoder(mForFingerprints,false);
-    long lastValue=fps[0];
-    DataOutputBuffer testBuffer = new DataOutputBuffer();
-    for (int i=1;i<fps.length;++i) {
-      long delta =  fps[i] - lastValue;
-      coding.addItem(delta + 1);
-      try {
-        WritableUtils.writeVLong(testBuffer, delta);
-      } catch (IOException e) {
-        // TODO Auto-generated catch block
-        e.printStackTrace();
-      }
-      lastValue = fps[i];
-    }
-    System.out.println("Number of Bits:" + coding.nbits);
-    System.out.println("Number of Bytes:" + (coding.nbits >> 3));
-    System.out.println("Number of VLong Bytes:" + testBuffer.getLength());
-    System.out.println("FP Bytes:" + ((fps.length -1) * 8));
-
-    double fileIdTotal = 0.0;
-    int fileId[] = new int[1000];
-    int fileIdLast = 0;
-    for (int i=0;i<fileId.length;++i) { 
-      fileId[i] = (int) (Math.random() * 32000); 
-      fileIdTotal += Math.abs((fileId[i] - fileIdLast));
-      fileIdLast = fileId[i];
+    try {
+      Assert.assertTrue(testReader.nextValue() == 0);
+      Assert.assertTrue(testReader.nextValue() == 1);
+      Assert.assertTrue(testReader.nextValue() == -1);
+      Assert.assertTrue(testReader.nextValue() == Long.MAX_VALUE);
+      Assert.assertTrue(testReader.nextValue() == Long.MAX_VALUE - 1);
+      Assert.assertTrue(testReader.nextValue() == Long.MIN_VALUE + 1);
+      Assert.assertTrue(testReader.nextValue() == Long.MIN_VALUE);
+      
+    } catch (IOException e1) {
+      e1.printStackTrace();
     }
     
     try { 
-      DataOutputBuffer gzipOutput = new DataOutputBuffer();
-      GZIPOutputStream gzipStream = new GZIPOutputStream(gzipOutput);
-      DataOutputStream gzipData   = new DataOutputStream(gzipStream);
+      RiceCodeReader newReader = new RiceCodeReader(54,test.nbits,new FSDataInputStream(new ByteBufferInputStream(ByteBuffer.wrap(test.bits))),0,true);
       
-      double fileIdAvg = fileIdTotal / fileId.length;
-      System.out.println("FileId Avg Value:" + fileIdAvg);
-      int mForFileIds =  (int) Math.floor(lg(fileIdAvg));
-      RiceCoder fileIdCoding = new RiceCoder(mForFileIds,true);
-      DataOutputBuffer testBuffer2 = new DataOutputBuffer();
-
-      int fieldIdLast = 0;
-      for (int i=0;i<fileId.length;++i) { 
-        fileIdCoding.addItem((fileId[i] - fieldIdLast) + 1);
-        System.out.println("FieldId Delta:" + (fileId[i] - fieldIdLast));
-        fieldIdLast = fileId[i];
-        gzipData.writeInt(fileId[i]);
-        WritableUtils.writeVInt(testBuffer2,fileId[i]);
+      try {
+        Assert.assertTrue(newReader.nextValue() == 0);
+        Assert.assertTrue(newReader.nextValue() == 1);
+        Assert.assertTrue(newReader.nextValue() == -1);
+        Assert.assertTrue(newReader.nextValue() == Long.MAX_VALUE);
+        Assert.assertTrue(newReader.nextValue() == Long.MAX_VALUE - 1);
+        Assert.assertTrue(newReader.nextValue() == Long.MIN_VALUE + 1);
+        Assert.assertTrue(newReader.nextValue() == Long.MIN_VALUE);
+        
+      } catch (IOException e1) {
+        e1.printStackTrace();
       }
-      gzipData.flush();
-      gzipStream.flush();
-      gzipStream.close();
       
-      System.out.println("FileId Compressed Bytes:" + (fileIdCoding.nbits >> 3));
-      System.out.println("FileId Bytes:" + (fileId.length * 4));
-      System.out.println("FileId GZIPBytes :" + gzipOutput.getLength());
-      System.out.println("FileId VLong Bytes:" + testBuffer2.getLength());
-      
-      for (int i=0;i<100;++i) { 
-        RiceCodeReader reader = new RiceCodeReader(mForFingerprints,coding.nbits,ByteBuffer.wrap(coding.bits),false);
-        long startTime = System.currentTimeMillis();
-        while (reader.hasNext()) { 
-          reader.nextValue();
-        }
-        long endTime = System.currentTimeMillis();
-        System.out.println("Time Elapshed:" + (endTime - startTime));
-      }
     }
     catch (IOException e) { 
-      e.printStackTrace();
+      LOG.error(CCStringUtils.stringifyException(e));
     }
   }
   

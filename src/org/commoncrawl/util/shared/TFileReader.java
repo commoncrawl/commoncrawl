@@ -57,6 +57,10 @@ public class TFileReader<KeyType extends Writable,ValueType extends Writable> {
     return false;
   }
   
+  public boolean hasMoreData() { 
+    return (_scanner != null && !_scanner.atEnd());
+  }
+  
   public void close() { 
     if (_scanner != null)
       try {

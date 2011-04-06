@@ -292,22 +292,22 @@ public class JRecord extends JCompType {
         cb
             .append("public final boolean isFieldDirty(int fieldId) { return __validFields.get(fieldId); }\n");
         cb
-            .append("public final void setFieldDirty(int fieldId) { __validFields.set(fieldId); }\n\n");
+            .append("public final " + name +  "  setFieldDirty(int fieldId) { __validFields.set(fieldId); return this; }\n\n");
         cb
-            .append("public final void setFieldClean(int fieldId) { __validFields.clear(fieldId); }\n\n");
+            .append("public final " + name +"  setFieldClean(int fieldId) { __validFields.clear(fieldId); return this; }\n\n");
       } else {
         cb
             .append("public final boolean isFieldDirty(int fieldId) { return true; }\n");
-        cb.append("public final void setFieldDirty(int fieldId) { }\n\n");
-        cb.append("public final void setFieldClean(int fieldId) { }\n\n");
+        cb.append("public final " +  name + " setFieldDirty(int fieldId) { return this; }\n\n");
+        cb.append("public final " +  name + " setFieldClean(int fieldId) { return this; }\n\n");
       }
 
       // TODO: FIX GET SET IF NECESSARY
       for (Iterator<JField<JavaType>> i = fields.iterator(); i.hasNext();) {
         JField<JavaType> jf = i.next();
-        String name = jf.getName();
+        String fieldName = jf.getName();
         JavaType type = jf.getType();
-        type.genGetSet(cb, name,
+        type.genGetSet(cb, this.name,fieldName,
             (jf.getModifiers() & JField.Modifiers.TRANSIENT) == 0
                 && trackDirtyFields());
       }

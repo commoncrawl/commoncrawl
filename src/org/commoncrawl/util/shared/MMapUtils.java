@@ -33,6 +33,9 @@ import java.lang.reflect.Method;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.fs.FSDataInputStream;
+import org.apache.hadoop.fs.FSInputStream;
+import org.apache.hadoop.fs.Seekable;
 
 /**
  * some utility classes to do memory mapped io in java 
@@ -150,8 +153,10 @@ public class MMapUtils {
       }
     }
     
-    public MMapFileInputStream newInputStream() throws IOException { 
-      return new MMapFileInputStream();
+    public FSDataInputStream newInputStream() throws IOException { 
+      FSInputStream stream = new MMapFileInputStream();
+      FSDataInputStream dataStream = new FSDataInputStream(stream);
+      return dataStream;
     }
     
     public void close()throws IOException { 
@@ -168,9 +173,9 @@ public class MMapUtils {
     // Because Java's ByteBuffer uses an int to address the
     // values, it's necessary to access a file >
     // Integer.MAX_VALUE in size using multiple byte buffers.
-    public class MMapFileInputStream extends InputStream {
+    public class MMapFileInputStream extends FSInputStream {
     
-      private int curBufIndex;
+      private int curBufIndex = 0;
       private final int maxBufSize = getMaxChunkSize();
       private ByteBuffer curBuf; // redundant for speed: buffers[curBufIndex]
       
@@ -178,16 +183,17 @@ public class MMapUtils {
         seek(0L);
       }
     
+      @Override
       public int read() throws IOException {
         try {
-          return curBuf.get();
+          return curBuf.get() & 0xff;
         } catch (BufferUnderflowException e) {
           curBufIndex++;
           if (curBufIndex >= buffers.length)
             throw new IOException("read past EOF");
           curBuf = buffers[curBufIndex].slice();
           curBuf.position(0);
-          return curBuf.get();
+          return curBuf.get() & 0xff;
         }
       }
     
@@ -219,10 +225,37 @@ public class MMapUtils {
       
       @Override
       public int available() throws IOException {
-        long amtAvailable = (length() - getFilePointer());
+        long amtAvailable = (length() - getPos());
         return (amtAvailable <= Integer.MAX_VALUE) ? (int)amtAvailable : Integer.MAX_VALUE;
       };
     
+      @Override
+      public void seek(long pos) throws IOException {
+        int bufferIndex = (int) (pos / maxBufSize);
+        if (curBuf == null || bufferIndex != curBufIndex) { 
+          curBufIndex = bufferIndex;
+          curBuf = buffers[curBufIndex].slice();
+        }
+        int bufOffset = (int) (pos - ((long) curBufIndex * maxBufSize));
+        curBuf.position(bufOffset);
+      }
+    
+      public long length() {
+        return length;
+      }
+
+      @Override
+      public long getPos() throws IOException {
+        return ((long) curBufIndex * maxBufSize) + curBuf.position();
+      }
+
+      @Override
+      public boolean seekToNewSource(long targetPos) throws IOException {
+        seek(targetPos);
+        return false;
+      }
+
+      
       public short readShort() throws IOException {
         try {
           return curBuf.getShort();
@@ -276,21 +309,6 @@ public class MMapUtils {
         return i;
       }
 
-      
-      public long getFilePointer() {
-        return ((long) curBufIndex * maxBufSize) + curBuf.position();
-      }
-    
-      public void seek(long pos) throws IOException {
-        curBufIndex = (int) (pos / maxBufSize);
-        curBuf = buffers[curBufIndex].slice();
-        int bufOffset = (int) (pos - ((long) curBufIndex * maxBufSize));
-        curBuf.position(bufOffset);
-      }
-    
-      public long length() {
-        return length;
-      }
     
     }    
   }
