@@ -119,6 +119,8 @@ public class MMapUtils {
     long length = -1;
     ByteBuffer buffers[]=null;
     int        bufSizes[] = null;
+    private int refCount =0;
+    private boolean closePending = false;
     
     public MMapFile(File input) throws IOException { 
       RandomAccessFile raf = new RandomAccessFile(input, "r");
@@ -159,9 +161,31 @@ public class MMapUtils {
       return dataStream;
     }
     
-    public void close()throws IOException { 
-      for (ByteBuffer buffer : buffers) { 
-        cleanMapping(buffer);
+    private synchronized void addRef() { 
+      refCount++;
+    }
+    
+    private synchronized void release() { 
+      if (--refCount == 0 && closePending) { 
+        try {
+          close();
+        } catch (IOException e) {
+          LOG.error(CCStringUtils.stringifyException(e));
+        }
+      }
+    }
+    
+    public synchronized void close()throws IOException {
+      if (refCount == 0) {
+        if (buffers != null) { 
+          for (ByteBuffer buffer : buffers) { 
+            cleanMapping(buffer);
+          }
+        }
+        buffers = null;
+      }
+      else { 
+        closePending = true;
       }
     }
     
@@ -180,6 +204,7 @@ public class MMapUtils {
       private ByteBuffer curBuf; // redundant for speed: buffers[curBufIndex]
       
       public MMapFileInputStream() throws IOException {
+        addRef();
         seek(0L);
       }
     
@@ -221,6 +246,11 @@ public class MMapUtils {
           curBuf.get(bytes, offset, len);
           return bytesRead + len;
         }
+      }
+      
+      @Override
+      public void close() throws IOException {
+        release();
       }
       
       @Override
