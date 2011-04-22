@@ -194,6 +194,10 @@ public abstract class CommonCrawlServer extends RPCActorService {
     _useAsyncWebDispatch = asyncWebDispatch;
   }
 
+  public FileSystem getFileSystem() { 
+    return _fileSystem;
+  }
+  
   public String getHostName() {
     return _hostName;
   }
@@ -494,6 +498,10 @@ public abstract class CommonCrawlServer extends RPCActorService {
       if (_commonConfig._className == null) {
         printCommonUsage();
         return;
+      }
+      if (_commonConfig._configName != null) { 
+        LOG.info("Processing Config File:" + _commonConfig._configName);
+        conf.addResource(_commonConfig._configName);
       }
 
       if (_commonConfig._hostName != null) {

@@ -21,8 +21,11 @@ import java.io.DataOutput;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 
+import org.apache.hadoop.io.BytesWritable;
+import org.apache.hadoop.io.RawComparator;
 import org.apache.hadoop.io.WritableComparable;
 import org.apache.hadoop.io.WritableUtils;
+import org.apache.hadoop.io.file.tfile.RawComparable;
 
 /**
  * A tweaking of the hadoop Buffer class, basically allowing for cheap buffer
@@ -34,7 +37,7 @@ import org.apache.hadoop.io.WritableUtils;
  * capacity.
  * 
  */
-public final class FlexBuffer implements WritableComparable, Cloneable {
+public final class FlexBuffer implements WritableComparable<FlexBuffer>,RawComparator<FlexBuffer>,RawComparable, Cloneable {
   /** Number of valid bytes in this.bytes. */
   int     count;
   /** Backing store for Buffer. */
@@ -295,26 +298,16 @@ public final class FlexBuffer implements WritableComparable, Cloneable {
    * @return Positive if this is bigger than other, 0 if they are equal, and
    *         negative if this is smaller than other.
    */
-  public int compareTo(Object other) {
-    FlexBuffer right = ((FlexBuffer) other);
-    byte[] lb = this.get();
-    int leftOffset = this.getOffset();
-    byte[] rb = right.get();
-    int rightOffset = right.getOffset();
-    for (int i = 0; i < count && i < right.count; i++) {
-      int a = (lb[i + leftOffset] & 0xff);
-      int b = (rb[i + rightOffset] & 0xff);
-      if (a != b) {
-        return a - b;
-      }
-    }
-    return count - right.count;
+  public int compareTo(FlexBuffer other) {
+    return BytesWritable.Comparator.compareBytes(
+        this.zbytes, this.offset, this.count,
+        other.zbytes, other.offset, other.count);
   }
 
   // inherit javadoc
   public boolean equals(Object other) {
     if (other instanceof FlexBuffer && this != other) {
-      return compareTo(other) == 0;
+      return compareTo((FlexBuffer)other) == 0;
     }
     return (this == other);
   }
@@ -392,5 +385,30 @@ public final class FlexBuffer implements WritableComparable, Cloneable {
     if (getCount() != 0) {
       out.write(get(), getOffset(), getCount());
     }
+  }
+
+  @Override
+  public int compare(byte[] b1, int s1, int l1, byte[] b2, int s2, int l2) {
+    return BytesWritable.Comparator.compareBytes(b1,s1,l1,b2,s2,l2);
+  }
+
+  @Override
+  public int compare(FlexBuffer o1, FlexBuffer o2) {
+    return o1.compareTo(o2);
+  }
+
+  @Override
+  public byte[] buffer() {
+    return zbytes;
+  }
+
+  @Override
+  public int offset() {
+    return offset;
+  }
+
+  @Override
+  public int size() {
+    return count;
   }
 }

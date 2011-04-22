@@ -260,12 +260,12 @@ public final class TextBytes extends BinaryComparable implements
 
   /** copy a text. */
   public void set(Text other,boolean shared) {
-    set(other.getBytes(), 0, other.getLength(),shared);
+    set(other.getBytes(), 0 , other.getLength(),shared);
   }
 
   /** copy a textbytes. */
   public void set(TextBytes other,boolean shared) {
-    set(other.getBytes(), 0, other.getLength(),shared);
+    set(other.getBytes(), other.getOffset(), other.getLength(),shared);
   }
 
   /**
