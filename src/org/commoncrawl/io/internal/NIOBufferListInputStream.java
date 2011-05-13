@@ -16,6 +16,7 @@
 
 package org.commoncrawl.io.internal;
 
+import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
@@ -65,6 +66,78 @@ public class NIOBufferListInputStream extends InputStream {
 		available += _source.available();
 		
 		return available;
+	}
+	
+	/**
+	 * create and return  a substream of a desired size - consume desired size
+	 * bytes from source stream.
+	 * 
+	 * 
+	 * @param desiredStreamSize - Desired Stream Size. If current stream
+	 * contains less than disired size bytes an EOFException is thrown.
+	 * @return new NIOBufferListInputStream contstrained to desired stream size
+	 * @throws IOException
+	 */
+	public NIOBufferListInputStream subStream(int desiredStreamSize)throws IOException { 
+	  // throw EOF if we don't have enough bytes to service the request 
+	  if (available() < desiredStreamSize) { 
+	    throw new EOFException();
+	  }
+	  // otherwise ... allocate a new buffer list ...  
+	  NIOBufferList bufferList = new NIOBufferList();
+	  
+	  int sizeOut = 0;
+	  int len = desiredStreamSize;
+	  
+	  // walk buffers from existing stream + source buffer list ... 
+      while (len != 0) { 
+          // grab new ByteBuffer from buffer list if necessary ... 
+          ensureBuffer();
+          
+          //if we could get another buffer from list. bail... 
+          if (_buffer == null) { 
+              break;
+          }
+          
+          // calculate bytes available
+          final int sizeAvailable = _buffer.remaining();
+          // and bytes to read this iteration ... 
+          final int sizeToRead    = Math.min(sizeAvailable,len);
+          // if we can consume entire buffer ... 
+          if (sizeAvailable <= sizeToRead) {
+            // slice the existing buffer ... 
+            ByteBuffer buffer = _buffer.slice();
+            // position it to limit (bufferList.write flips it, so we must do this).
+            buffer.position(buffer.limit());
+            // add to buffer list via write 
+            bufferList.write(buffer);
+            // null out this buffer as it has been fully consumed 
+            _buffer = null;
+          }
+          else {
+            // slice the existing buffer 
+            ByteBuffer buffer = _buffer.slice();
+            // reset limit on new buffer 
+            buffer.limit(buffer.position() + sizeToRead);
+            // position the new buffer to limit (to facilitate flip in write call)
+            buffer.position(buffer.limit());
+            // add it to buffer list 
+            bufferList.write(buffer);
+            // and increment position of source buffer 
+            _buffer.position(_buffer.position() + sizeToRead);
+          }
+          
+          len -= sizeToRead;
+          sizeOut += sizeToRead;
+      }
+      // flush any trailing write buffer in new list ... 
+      bufferList.flush();
+      
+      if (sizeOut != desiredStreamSize) {
+        throw new EOFException();
+      }
+      
+      return new NIOBufferListInputStream(bufferList);	  
 	}
 
 	//@Override
