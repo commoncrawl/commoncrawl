@@ -129,6 +129,18 @@ public final class TextBytes extends BinaryComparable implements
   public TextBytes(byte[] utf8,boolean shared) {
     set(utf8,shared);
   }
+  
+  /**
+   * Construct from a byte array with offset and length
+   * 
+   * @param utf8
+   * @param offset
+   * @param len
+   * @param shared
+   */
+  public TextBytes(byte[] utf8,int offset,int len,boolean shared) { 
+    set(utf8,offset,len,shared);
+  }
 
   /**
    * get underlying buffer object
