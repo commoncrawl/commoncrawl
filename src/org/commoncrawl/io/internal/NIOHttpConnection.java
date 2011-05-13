@@ -19,7 +19,9 @@ package org.commoncrawl.io.internal;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.io.PrintWriter;
+import java.io.Reader;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.URL;
@@ -1161,9 +1163,9 @@ public final class NIOHttpConnection implements NIOClientSocketListener , NIODNS
         setState(State.PARSING_HEADERS,null);
   
         // now parse headers ... 
-        ByteArrayInputStream input = new ByteArrayInputStream(_incomingAccumulationBuffer.toByteArray());
+        Reader reader  = new InputStreamReader(new ByteArrayInputStream(_incomingAccumulationBuffer.toByteArray()),Charset.forName("UTF-8"));
         
-        _responseHeaders.mergeHeader(input);
+        _responseHeaders.mergeHeader(reader);
         
         // check to see if cookie store is available ... 
         if (_cookieStore != null) { 

@@ -35,21 +35,19 @@ public class CharsetUtils {
     return (alias != null) ? alias : inputCharset;
   }
 
-  public static String bestEffortDecodeBytes(String headers, byte[] crawlData)
+  public static String bestEffortDecodeBytes(NIOHttpHeaders headers, byte[] crawlData,int offset,int length)
       throws IOException {
 
     ContentTypeAndCharset urlMetadata = new ContentTypeAndCharset();
 
-    // parse final header result and populate appropriate metadata fields
-    NIOHttpHeaders finalHeaders = NIOHttpHeaders.parseHttpHeaders(headers);
-    HttpHeaderUtils.parseContentType(finalHeaders, urlMetadata);
+    HttpHeaderUtils.parseContentType(headers, urlMetadata);
 
     if (urlMetadata._charset != null && crawlData != null) {
       if (urlMetadata._contentType != null
           && urlMetadata._contentType.equalsIgnoreCase("text/html")) {
         // sniff encoding in metadata ...
         String alternateCharset = CharsetUtils
-            .sniffCharacterEncoding(crawlData);
+            .sniffCharacterEncoding(crawlData,offset,length);
         if (alternateCharset != null) {
           urlMetadata._charset = alternateCharset;
         }
@@ -63,7 +61,7 @@ public class CharsetUtils {
           && MimeTypeFilter.isTextType(urlMetadata._contentType)) {
         // try to detect the charset from the stream ...
         String detectedCharset = CharsetUtils
-            .detetechCharacterEncoding(crawlData);
+            .detectCharacterEncoding(crawlData,offset,length);
 
         if (detectedCharset != null) {
           urlMetadata._charset = (detectedCharset);
@@ -91,7 +89,7 @@ public class CharsetUtils {
         LOG.error(CCStringUtils.stringifyException(e));
         // try to detect the charset from the stream ...
         String detectedCharset = CharsetUtils
-            .detetechCharacterEncoding(crawlData);
+            .detectCharacterEncoding(crawlData,offset,length);
         if (detectedCharset != null) {
           try {
             charset = Charset.forName(detectedCharset);
@@ -102,7 +100,7 @@ public class CharsetUtils {
       }
       if (charset != null) {
         try {
-          CharBuffer ucs2Chars = charset.decode(ByteBuffer.wrap(crawlData));
+          CharBuffer ucs2Chars = charset.decode(ByteBuffer.wrap(crawlData,offset,length));
           return ucs2Chars.toString();
         } catch (Exception e) {
           LOG.error(CCStringUtils.stringifyException(e));
@@ -141,10 +139,10 @@ public class CharsetUtils {
    *          <code>byte[]</code> representation of an html file
    */
 
-  public static String sniffCharacterEncoding(byte[] content) {
+  public static String sniffCharacterEncoding(byte[] content,int offset,int length) {
 
     // LOG.info("ENTERING SNIFFCHARENCODING...");
-    int length = content.length < CHUNK_SIZE ? content.length : CHUNK_SIZE;
+    length = length < CHUNK_SIZE ? length : CHUNK_SIZE;
 
     // We don't care about non-ASCII parts so that it's sufficient
     // to just inflate each byte to a 16-bit value by padding.
@@ -152,7 +150,7 @@ public class CharsetUtils {
     // {U+0041, U+0082, U+00B7}.
     String str = "";
     try {
-      str = new String(content, 0, length, Charset.forName("ASCII").toString());
+      str = new String(content, offset, length, Charset.forName("ASCII").toString());
     } catch (UnsupportedEncodingException e) {
       // code should never come here, but just in case...
       return null;
@@ -189,7 +187,7 @@ public class CharsetUtils {
   private static int MAX_CHARS_TO_DETECT = 16000;
 
   /** last resort - detect encoding using charset detector **/
-  public static String detetechCharacterEncoding(byte[] content) {
+  public static String detectCharacterEncoding(byte[] content,int offset,int length) {
 
     if (content != null && content.length != 0) {
 
@@ -199,6 +197,12 @@ public class CharsetUtils {
 
       detector.Init(state);
 
+      if (offset != 0) { 
+        byte[] contentCopy = new byte[Math.min(length, MAX_CHARS_TO_DETECT)];
+        System.arraycopy(content,offset, contentCopy,0,length);
+        content = contentCopy;
+      }
+      
       boolean isAscii = detector.isAscii(content, content.length);
 
       if (!isAscii) {

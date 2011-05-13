@@ -62,8 +62,8 @@ public final class NIOHttpHeaders {
     grow();
   }
 
-  public NIOHttpHeaders(InputStream is) throws java.io.IOException {
-    parseHeader(is);
+  public NIOHttpHeaders(Reader reader) throws java.io.IOException {
+    parseHeader(reader);
   }
 
   /**
@@ -105,6 +105,10 @@ public final class NIOHttpHeaders {
     return -1;
   }
 
+  public synchronized int  getKeyCount(){ 
+    return nkeys;
+  }
+  
   public synchronized String getKey(int n) {
     if (n < 0 || n >= nkeys)
       return null;
@@ -400,19 +404,19 @@ public final class NIOHttpHeaders {
   }
 
   /** Parse a MIME header from an input stream. */
-  public void parseHeader(InputStream is) throws java.io.IOException {
+  public void parseHeader(Reader reader) throws java.io.IOException {
     synchronized (this) {
       nkeys = 0;
     }
-    mergeHeader(is);
+    mergeHeader(reader);
   }
 
   /** Parse and merge a MIME header from an input stream. */
-  public void mergeHeader(InputStream is) throws java.io.IOException {
-    if (is == null)
+  public void mergeHeader(Reader reader) throws java.io.IOException {
+    if (reader == null)
       return;
     char s[] = new char[10];
-    int firstc = is.read();
+    int firstc = reader.read();
     while (firstc != '\n' && firstc != '\r' && firstc >= 0) {
       int len = 0;
       int keyend = -1;
@@ -420,7 +424,7 @@ public final class NIOHttpHeaders {
       boolean inKey = firstc > ' ';
       s[len++] = (char) firstc;
       parseloop: {
-        while ((c = is.read()) > 0) {
+        while ((c = reader.read()) > 0) {
           switch (c) {
             case ':':
               if (inKey && len > 0)
@@ -434,11 +438,11 @@ public final class NIOHttpHeaders {
               break;
             case '\r':
             case '\n':
-              firstc = is.read();
+              firstc = reader.read();
               if (c == '\r' && firstc == '\n') {
-                firstc = is.read();
+                firstc = reader.read();
                 if (firstc == '\r')
-                  firstc = is.read();
+                  firstc = reader.read();
               }
               if (firstc == '\n' || firstc == '\r' || firstc > ' ')
                 break parseloop;
@@ -529,7 +533,7 @@ public final class NIOHttpHeaders {
     NIOHttpHeaders headersOut = new NIOHttpHeaders();
 
     if (headers != null && headers.length() != 0) {
-      headersOut.parseHeader(new ByteArrayInputStream(headers.getBytes(Charset.forName("UTF-8"))));
+      headersOut.parseHeader(new StringReader(headers));
     }
     return headersOut;
   }

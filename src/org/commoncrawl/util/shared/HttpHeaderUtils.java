@@ -151,4 +151,73 @@ public class HttpHeaderUtils {
     return endPos;
   }
 
+  public static int parseStatusLine(NIOHttpHeaders headers) {
+    
+    String responseLine = headers.getValue(0);
+    
+    return parseStatusLine(responseLine);
+    
+  }
+  
+  public static int parseStatusLine(String responseLine) { 
+    
+    if (responseLine == null || responseLine.length() < 4) { 
+      return 200;
+    }
+    else{ 
+      responseLine = responseLine.toLowerCase();
+      if (!responseLine.startsWith("http")) { 
+        return 200;
+      }
+      else{
+        boolean versionValid = false;
+        
+        if (responseLine.length() > 4 || responseLine.charAt(4) == '/') { 
+          int indexOfDot = responseLine.indexOf(".",5);
+          if (indexOfDot != -1 && indexOfDot != 5 || indexOfDot + 1 < responseLine.length()) { 
+            char majorVersionChar = responseLine.charAt(5);
+            char minorVersionChar = responseLine.charAt(indexOfDot + 1);
+            if (majorVersionChar >= '0' && majorVersionChar <= '9' && minorVersionChar >= '0' && minorVersionChar <= '9') {
+              int majorVersion = majorVersionChar - '0';
+              int minorVersion = minorVersionChar - '0';
+              if (majorVersion == 1 && minorVersion == 0) { 
+                //metadata.setHttpResponseFlags((byte)CrawlURLMetadata.HTTPResponseFlags.VERSION_1_0);
+              }
+              else if (majorVersion == 1 && minorVersion == 1){ 
+                //metadata.setHttpResponseFlags((byte)CrawlURLMetadata.HTTPResponseFlags.VERSION_1_1);
+              }
+              else {  
+                //metadata.setHttpResponseFlags((byte)CrawlURLMetadata.HTTPResponseFlags.VERSION_0_9);
+              }
+              versionValid = true;
+              
+              // now skip past
+              int spaceIndex = responseLine.indexOf(' ',indexOfDot + 1);
+              if (spaceIndex + 1 < responseLine.length()) { 
+                int digitStart = spaceIndex + 1;
+                int digitEnd   = digitStart;
+                while (digitEnd < responseLine.length()) {
+                  char c = responseLine.charAt(digitEnd);
+                  if (c >= '0' && c <= '9')
+                    ++digitEnd;
+                  else 
+                    break;
+                }
+                if (digitEnd - digitStart != 0) { 
+                  try { 
+                    return Integer.parseInt(responseLine.substring(digitStart,digitEnd));
+                  }
+                  catch (NumberFormatException e) { 
+                    return 0;
+                  }
+                }
+              }
+            }
+          }
+        }
+        
+        return 200; // by default ...
+      }
+    }
+  }  
 }
