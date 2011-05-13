@@ -65,11 +65,11 @@ public final class NIOBufferList {
   private Condition      _readEvent = null;
   
   /** get set consumer **/
-  public NIODataSink getSink() { 
+  public synchronized NIODataSink getSink() { 
     return _consumer;
   }
 
-  public void setSink(NIODataSink consumer) { 
+  public synchronized void setSink(NIODataSink consumer) { 
     _consumer = consumer;
   }
   
@@ -84,35 +84,32 @@ public final class NIOBufferList {
   public void setMaxBufferSize(int size) { _maxBufferSize = size; }
   
   /** Reset State (Release buffers) */
-  public void reset() { 
+  public synchronized void reset() { 
     _bufferList.clear();
     _readBuffer = null;
     _writeBuffer = null;
   }
 
   /** Returns true if there is data available (to be read) in the buffer */
-  public boolean isDataAvailable() { 
+  public synchronized boolean isDataAvailable() { 
     if (_readBuffer != null && _readBuffer.remaining() != 0 )
       return true;
     else {
-    	synchronized(this) { 
-    		return _bufferListBytes != 0;
-    	}
+      return _bufferListBytes != 0;
     }
   }
   
   /** Returns the number of readable bytes */
-  public int available() { 
+  public synchronized int available() { 
     
     int size = 0;
     if (_readBuffer != null) {
       size += _readBuffer.remaining();
     }
     
-    synchronized(this) { 
-    	size += _bufferListBytes;
-    }
-    return size;
+  	size += _bufferListBytes;
+
+  	return size;
   }
   
   /* Skip ahead from the current Read Cursor position */
@@ -292,12 +289,12 @@ public final class NIOBufferList {
   }
   
   /* peek at ByteBuffer - don't get */
-  public ByteBuffer peekAtWriteBuffer(){ 
+  public synchronized ByteBuffer peekAtWriteBuffer(){ 
     return _writeBuffer;
   }
   
   /* add a previously written buffer to the tail of the read queue */
-  public void write(ByteBuffer buffer) throws IOException {
+  public synchronized void write(ByteBuffer buffer) throws IOException {
     // NOTE: buffer should already be flipped for READ 
     
     // flush existing open buffer ...
@@ -381,7 +378,7 @@ public final class NIOBufferList {
    *                 Caller only writes into it.
    * @throws IOException
    */
-  public ByteBuffer getWriteBuf() throws IOException {
+  public synchronized ByteBuffer getWriteBuf() throws IOException {
     
     if (_writeBuffer == null || _writeBuffer.hasRemaining() == false) { 
       
@@ -395,22 +392,25 @@ public final class NIOBufferList {
   
   /** flush any partial writes and add the resulting ByteBuffer to the read queue */
   public void flush() { 
-	  
-    if (_writeBuffer != null && _writeBuffer.position() != 0) { 
+	
+    NIODataSink sink = null;
+    ByteBuffer lastWriteBuffer = null;
     
-      _lastWriteBufSize = Math.max(_minBufferSize,_writeBuffer.position());
+    synchronized (this) {
+      if (_writeBuffer != null && _writeBuffer.position() != 0) { 
       
-      synchronized(this) {
+        _lastWriteBufSize = Math.max(_minBufferSize,_writeBuffer.position());
+        
         // get the buffer ready for a read ... 
         _writeBuffer.flip();
         if (_readBuffer == _writeBuffer) { 
           throw new RuntimeException("read and write buffer pointers identical !!!");
         }
-
-        // now ...  tricky ... if blocking consumer is specified ... delegate buffer queuing to it .. 
-        if (getSink() != null) { 
-          // and pass on the buffer to the consumer ... 
-          getSink().available(_writeBuffer);
+        
+        // now ...  tricky ... if blocking consumer is specified ... delegate buffer queuing to it ..
+        sink = getSink();
+        if (sink != null) {
+          lastWriteBuffer = _writeBuffer;
         }
         else {
           // increment queued bytes count ... 
@@ -423,6 +423,12 @@ public final class NIOBufferList {
         _writeBuffer = null;
       }
     }
+    
+    if (sink != null && lastWriteBuffer != null) { 
+      // and pass on the buffer to the consumer ... 
+      getSink().available(lastWriteBuffer);
+    }
+    
   }
   
 }
