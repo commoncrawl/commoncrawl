@@ -214,7 +214,7 @@ public class RPCFrame {
     }
 
     @SuppressWarnings("unchecked")
-    public int encodeResponse(IncomingMessageContext context) throws IOException {
+    public synchronized int encodeResponse(IncomingMessageContext context) throws IOException {
 
       HeaderOutputStream headerStream = new HeaderOutputStream();
 
@@ -249,7 +249,7 @@ public class RPCFrame {
     }
 
     @SuppressWarnings("unchecked")
-    public int encodeRequest(OutgoingMessageContext request) throws IOException {
+    public synchronized int encodeRequest(OutgoingMessageContext request) throws IOException {
 
       HeaderOutputStream headerStream = new HeaderOutputStream();
 
@@ -278,7 +278,7 @@ public class RPCFrame {
       return encode(headerStream, payload);
     }
 
-    private int encode(HeaderOutputStream header, PayloadOutputStream payload)
+    private synchronized int encode(HeaderOutputStream header, PayloadOutputStream payload)
         throws IOException {
 
       DataOutput out = new DataOutputStream(_stream);
@@ -668,7 +668,7 @@ public class RPCFrame {
 
             // otherwise good to go ... create payload stream and return
             // populate frame
-            frame._payload = new PayloadInputStream(_stream, _payloadSize);
+            frame._payload = new PayloadInputStream(_stream.subStream(_payloadSize), _payloadSize);
 
             // and reset state ..
             reset();
