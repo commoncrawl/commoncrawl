@@ -59,7 +59,7 @@ public class TFileWriter<KeyType extends Writable,ValueType extends Writable> {
     if (_writer != null) { 
       try {
         _writer.close();
-      } catch (IOException e) {
+      } catch (Exception e) {
         LOG.error(CCStringUtils.stringifyException(e));
       }
       finally { 
@@ -70,7 +70,7 @@ public class TFileWriter<KeyType extends Writable,ValueType extends Writable> {
     if (_stream != null) { 
       try {
         _stream.close();
-      } catch (IOException e) {
+      } catch (Exception e) {
         LOG.error(CCStringUtils.stringifyException(e));
       }
       finally { 

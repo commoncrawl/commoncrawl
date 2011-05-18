@@ -1,5 +1,6 @@
 package org.commoncrawl.util.shared;
 
+import java.io.DataInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -48,7 +49,7 @@ public class TFileThriftObjectReader<KeyType extends TBase,ValueType extends TBa
   private TResettableTransport  _valueTransport = new TResettableTransport();
   private TBinaryProtocol       _keyProtocol= new TBinaryProtocol(_keyTransport);
   private TBinaryProtocol       _valueProtocol = new TBinaryProtocol(_valueTransport);
-  
+  private ValueReader           _valueReader = new ValueReader();
   
   
   public TFileThriftObjectReader(TFile.Reader reader) throws IOException { 
@@ -86,6 +87,41 @@ public class TFileThriftObjectReader<KeyType extends TBase,ValueType extends TBa
   
   public TFile.Reader.Scanner getScanner() { 
     return _scanner;
+  }
+  
+  public class ValueReader {
+    public TBinaryProtocol getProtocol() { 
+      return _valueProtocol;
+    }
+    
+    public void close() throws IOException { 
+      _scanner.advance();
+    }
+  }
+  
+  /**
+   * read the next key using the passed in object 
+   * and return a ValueReader object to the caller
+   * 
+   * @param key
+   * @return
+   * @throws IOException
+   */
+  public ValueReader next(KeyType key) throws IOException { 
+    if (_scanner != null && !_scanner.atEnd()) {
+      try {
+        _keyTransport.setInputStream(_scanner.entry().getKeyStream());
+        key.read(_keyProtocol);
+        // reset value transport 
+        DataInputStream stream = _scanner.entry().getValueStream();
+        //LOG.info("Stream Available:" + stream.available());
+        _valueTransport.setInputStream(stream);
+        return _valueReader;
+      } catch (TException e) {
+        throw new IOException(e);
+      }
+    }
+    return null;
   }
   
   public boolean next(KeyType keyType,ValueType valueType) throws IOException { 

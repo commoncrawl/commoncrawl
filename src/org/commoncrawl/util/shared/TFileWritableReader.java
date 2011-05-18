@@ -18,15 +18,15 @@ import org.apache.hadoop.io.file.tfile.TFile;
  * @author rana
  *
  */
-public class TFileReader<KeyType extends Writable,ValueType extends Writable> {
+public class TFileWritableReader<KeyType extends Writable,ValueType extends Writable> {
   
-  static final Log LOG = LogFactory.getLog(TFileReader.class);
+  static final Log LOG = LogFactory.getLog(TFileWritableReader.class);
       
   private FSDataInputStream     _inputStream;
   private TFile.Reader          _reader;
   private TFile.Reader.Scanner  _scanner;
   
-  public TFileReader(FileSystem fs,Configuration conf,Path path) throws IOException { 
+  public TFileWritableReader(FileSystem fs,Configuration conf,Path path) throws IOException { 
     FileStatus fileStatus = fs.getFileStatus(path);
     if (fileStatus == null) { 
       throw new IOException("Invalid File:" + path);
