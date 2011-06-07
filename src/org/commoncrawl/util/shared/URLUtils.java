@@ -268,7 +268,7 @@ public class URLUtils {
 
     try {
       // canonicalize the incoming url ...
-      String canonicalURL = URLUtils.canonicalizeURL(urlString, false);
+      String canonicalURL = URLUtils.canonicalizeURL(urlString, true);
 
       if (canonicalURL != null) {
         return getURLFPV2FromCanonicalURL(canonicalURL);
@@ -288,7 +288,7 @@ public class URLUtils {
   public static URLFPV2 getURLFPV2FromURLObject(GoogleURL urlObject) {
     try {
       // canonicalize the incoming url ...
-      String canonicalURL = URLUtils.canonicalizeURL(urlObject, false);
+      String canonicalURL = URLUtils.canonicalizeURL(urlObject, true);
 
       if (canonicalURL != null) {
         return getURLFPV2FromCanonicalURL(canonicalURL);

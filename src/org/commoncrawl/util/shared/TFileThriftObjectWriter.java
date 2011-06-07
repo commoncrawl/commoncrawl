@@ -37,8 +37,8 @@ public class TFileThriftObjectWriter<KeyType extends TBase,ValueType extends TBa
   TBinaryProtocol    _keyProto = new TBinaryProtocol(new TIOStreamTransport(_keyStream));
   TBinaryProtocol    _valueProto = new TBinaryProtocol(new TIOStreamTransport(_valueStream));
   
-  public TFileThriftObjectWriter(FileSystem fs,Configuration conf,Path path,String compressionScheme,int minCompressedBlockSize,Class< ? extends RawComparator<KeyType>> comparatorClass) throws IOException { 
-    _stream = fs.create(path);
+  public TFileThriftObjectWriter(FileSystem fs,Configuration conf,Path path,short replicationFactor,String compressionScheme,int minCompressedBlockSize,Class< ? extends RawComparator<KeyType>> comparatorClass) throws IOException { 
+    _stream = fs.create(path,replicationFactor);
     _writer = new TFile.Writer(_stream,minCompressedBlockSize,compressionScheme,TFile.COMPARATOR_JCLASS + comparatorClass.getName(), conf);
   }
   

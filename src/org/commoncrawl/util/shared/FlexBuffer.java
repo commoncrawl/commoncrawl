@@ -21,6 +21,7 @@ import java.io.DataOutput;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 
+import org.apache.hadoop.io.BinaryComparable;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.RawComparator;
 import org.apache.hadoop.io.WritableComparable;
@@ -37,7 +38,7 @@ import org.apache.hadoop.io.file.tfile.RawComparable;
  * capacity.
  * 
  */
-public final class FlexBuffer implements WritableComparable<FlexBuffer>,RawComparator<FlexBuffer>,RawComparable, Cloneable {
+public final class FlexBuffer extends BinaryComparableWithOffset implements WritableComparable<BinaryComparable>,RawComparator<FlexBuffer>,RawComparable, Cloneable {
   /** Number of valid bytes in this.bytes. */
   int     count;
   /** Backing store for Buffer. */
@@ -190,10 +191,6 @@ public final class FlexBuffer implements WritableComparable<FlexBuffer>,RawCompa
     this.count = count;
   }
 
-  /** Get current offset **/
-  public int getOffset() {
-    return offset;
-  }
 
   /**
    * Get the capacity, which is the maximum count that could handled without
@@ -411,4 +408,21 @@ public final class FlexBuffer implements WritableComparable<FlexBuffer>,RawCompa
   public int size() {
     return count;
   }
+
+  @Override
+  public byte[] getBytes() {
+    return zbytes;
+  }
+
+  @Override
+  public int getLength() {
+    return count;
+  }
+  
+  /** Get current offset **/
+  @Override
+  public int getOffset() {
+    return offset;
+  }
+  
 }

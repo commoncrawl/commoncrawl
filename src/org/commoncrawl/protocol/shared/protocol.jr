@@ -132,4 +132,39 @@ module org.commoncrawl.protocol.shared {
     [key] vlong urlHash = 2;
     vlong rootDomainHash = 3;           
   }   
+  
+  // cc-cache data structure  
+  class CacheItem { 
+  
+    // doucment url 
+    ustring url = 1;
+    // url fingerprint 
+    long urlFingerprint = 2;
+    
+    enum Source { 
+        WebRequest = 1;
+        S3Cache    = 2;
+    }
+    // document source 
+    byte source = 3;
+    
+    // flags 
+    enum Flags { 
+      Flag_IsTemporaryRedirect = 1;
+      Flag_IsPermanentRedirect = 2;
+      Flag_IsCompressed  = 4;
+      Flag_WasTruncatedDuringDownload = 8;
+      Flag_WasTruncatedDuringInflate  = 16;
+    }
+    int flags = 4;
+    
+    // if this was a redirect, the final url 
+    ustring finalURL = 5;
+    
+    // parsed header items ... 
+    vector<org.commoncrawl.protocol.shared.ArcFileHeaderItem> headerItems =6;
+    // content (if available)
+    buffer   content =7;
+  }  
+  
 }

@@ -216,6 +216,7 @@ public class DateUtils {
   public static void main(String[] args) {
     Assert.assertFalse(parseHttpDate("Sun, 22 Nov 2009 01:37:06GMT") == -1);
     Assert.assertFalse(parseHttpDate("Sun, 22 Nov 2009 01:37:06 GMT") == -1);
+    Assert.assertFalse(parseHttpDate("Thu, 26 May 2011 03:40:51 GMT") == -1);
 
   }
 }

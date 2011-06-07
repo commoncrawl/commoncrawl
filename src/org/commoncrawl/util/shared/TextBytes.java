@@ -47,7 +47,7 @@ import org.apache.hadoop.io.WritableUtils;
  * @author rana
  * 
  */
-public final class TextBytes extends BinaryComparable implements
+public final class TextBytes extends BinaryComparableWithOffset implements
     WritableComparable<BinaryComparable>,Cloneable {
 
   private static final Log                   LOG             = LogFactory

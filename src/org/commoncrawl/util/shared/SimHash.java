@@ -9,6 +9,8 @@ import java.io.IOException;
 import java.nio.CharBuffer;
 import java.util.Set;
 
+import org.mortbay.log.Log;
+
 /**
  * a basic SimHash implementation
  * 
@@ -28,6 +30,10 @@ public class SimHash {
    * @return 64 bit simhash of input string
    */
 
+  
+  // byte gram 
+  private static final int FIXED_BGRAM_LENGTH = 8;
+  // character gram
   private static final int FIXED_CGRAM_LENGTH = 4;
 
   public static long computeOptimizedSimHashForString(String s) {
@@ -39,8 +45,6 @@ public class SimHash {
     LongSet shingles = new LongOpenHashSet(Math.min(s.length(), 100000));
 
     int length = s.length();
-
-    long timeStart = System.currentTimeMillis();
     for (int i = 0; i < length - FIXED_CGRAM_LENGTH + 1; i++) {
       // extract an ngram
 
@@ -54,8 +58,62 @@ public class SimHash {
 
       shingles.add(shingle);
     }
-    long timeEnd = System.currentTimeMillis();
-    // System.out.println("NGram Production Took:" + (timeEnd-timeStart));
+
+    int v[] = new int[HASH_SIZE];
+    byte longAsBytes[] = new byte[8];
+
+    for (long shingle : shingles) {
+
+      longAsBytes[0] = (byte) (shingle >> 56);
+      longAsBytes[1] = (byte) (shingle >> 48);
+      longAsBytes[2] = (byte) (shingle >> 40);
+      longAsBytes[3] = (byte) (shingle >> 32);
+      longAsBytes[4] = (byte) (shingle >> 24);
+      longAsBytes[5] = (byte) (shingle >> 16);
+      longAsBytes[6] = (byte) (shingle >> 8);
+      longAsBytes[7] = (byte) (shingle);
+
+      long longHash = FPGenerator.std64.fp(longAsBytes, 0, 8);
+      for (int i = 0; i < HASH_SIZE; ++i) {
+        boolean bitSet = ((longHash >> i) & 1L) == 1L;
+        v[i] += (bitSet) ? 1 : -1;
+      }
+    }
+
+    long simhash = 0;
+    for (int i = 0; i < HASH_SIZE; ++i) {
+      if (v[i] > 0) {
+        simhash |= (1L << i);
+      }
+    }
+    return simhash;
+  }
+  
+  public static long computeOptimizedSimHashForBytes(byte[] data,int offset,int length) {
+
+    LongSet shingles = new LongOpenHashSet(Math.min(length/FIXED_BGRAM_LENGTH, 100000));
+
+    for (int i = offset; i < length - FIXED_BGRAM_LENGTH + 1; i++) {
+      int pos = i;
+      // extract an ngram
+      long shingle = data[pos++];
+      shingle <<= 8;
+      shingle |= data[pos++];
+      shingle <<= 8;
+      shingle |= data[pos++];
+      shingle <<= 8;
+      shingle |= data[pos++];
+      shingle <<= 8;
+      shingle |= data[pos++];
+      shingle <<= 8;
+      shingle |= data[pos++];
+      shingle <<= 8;
+      shingle |= data[pos++];
+      shingle <<= 8;
+      shingle |= data[pos];
+
+      shingles.add(shingle);
+    }
 
     int v[] = new int[HASH_SIZE];
     byte longAsBytes[] = new byte[8];
@@ -139,35 +197,36 @@ public class SimHash {
       stream2.read(data2);
       String string1 = new String(data1);
       String string2 = new String(data2);
-
-      long timeStart = System.currentTimeMillis();
-      long simhash1 = computeSimHashFromString(Shingle.shingles(string1));
-      long timeEnd = System.currentTimeMillis();
-      System.out.println("Old Calc for Document A Took:"
-          + (timeEnd - timeStart));
-      timeStart = System.currentTimeMillis();
-      long simhash2 = computeSimHashFromString(Shingle.shingles(string2));
-      timeEnd = System.currentTimeMillis();
-      System.out.println("Old Calc for Document B Took:"
-          + (timeEnd - timeStart));
-      timeStart = System.currentTimeMillis();
-      long simhash3 = computeOptimizedSimHashForString(string1);
-      timeEnd = System.currentTimeMillis();
-      System.out.println("New Calc for Document A Took:"
-          + (timeEnd - timeStart));
-      timeStart = System.currentTimeMillis();
-      long simhash4 = computeOptimizedSimHashForString(string2);
-      timeEnd = System.currentTimeMillis();
-      System.out.println("New Calc for Document B Took:"
-          + (timeEnd - timeStart));
-
-      int hammingDistance = hammingDistance(simhash1, simhash2);
-      int hammingDistance2 = hammingDistance(simhash3, simhash4);
-
-      System.out.println("hammingdistance Doc (A) to Doc(B) OldWay:"
-          + hammingDistance);
-      System.out.println("hammingdistance Doc (A) to Doc(B) NewWay:"
-          + hammingDistance2);
+      for (int i=0;i<100;++i) { 
+        long timeStart = System.currentTimeMillis();
+        long simhash1 = computeSimHashFromString(Shingle.shingles(string1));
+        long timeEnd = System.currentTimeMillis();
+        System.out.println("Old Calc for Document A Took:"
+            + (timeEnd - timeStart));
+        timeStart = System.currentTimeMillis();
+        long simhash2 = computeSimHashFromString(Shingle.shingles(string2));
+        timeEnd = System.currentTimeMillis();
+        System.out.println("Old Calc for Document B Took:"
+            + (timeEnd - timeStart));
+        timeStart = System.currentTimeMillis();
+        long simhash3 = computeOptimizedSimHashForBytes(data1,0,data1.length);
+        timeEnd = System.currentTimeMillis();
+        System.out.println("New Calc for Document A Took:"
+            + (timeEnd - timeStart));
+        timeStart = System.currentTimeMillis();
+        long simhash4 = computeOptimizedSimHashForBytes(data2,0,data2.length);
+        timeEnd = System.currentTimeMillis();
+        System.out.println("New Calc for Document B Took:"
+            + (timeEnd - timeStart));
+  
+        int hammingDistance = hammingDistance(simhash1, simhash2);
+        int hammingDistance2 = hammingDistance(simhash3, simhash4);
+  
+        System.out.println("hammingdistance Doc (A) to Doc(B) OldWay:"
+            + hammingDistance);
+        System.out.println("hammingdistance Doc (A) to Doc(B) NewWay:"
+            + hammingDistance2);
+      }
     } catch (IOException e) {
       e.printStackTrace();
     }
