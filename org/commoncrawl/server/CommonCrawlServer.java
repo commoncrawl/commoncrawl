@@ -566,7 +566,7 @@ public abstract class CommonCrawlServer extends RPCActorService {
   }
 
   /** return the ip address for a given network interface **/
-  protected static String[] getIPs(String strInterface)
+  public static String[] getIPs(String strInterface)
       throws UnknownHostException {
 
     Pattern pattern = Pattern.compile("([0-9]+).([0-9]+).([0-9]+).([0-9]+)");
