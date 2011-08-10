@@ -1,6 +1,7 @@
 package org.commoncrawl.util.shared;
 
 import org.apache.hadoop.io.BinaryComparable;
+import org.apache.hadoop.io.WritableComparable;
 import org.apache.hadoop.io.WritableComparator;
 
 /**
@@ -9,7 +10,7 @@ import org.apache.hadoop.io.WritableComparator;
  * @author rana
  *
  */
-public abstract class BinaryComparableWithOffset extends BinaryComparable {
+public abstract class BinaryComparableWithOffset extends BinaryComparable implements WritableComparable<BinaryComparable> {
 
   /**
    * get the offset into the underlying byte array  

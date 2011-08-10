@@ -1,0 +1,120 @@
+include "../protocol/shared/protocol.jr"
+
+module org.commoncrawl.query {
+  
+  class MasterState  [recordid] { 
+      long lastQueryId = 1;
+  }
+  
+  // an input split 
+  class QueryInputSplit { 
+    // the shard id 
+    [key] int shardId = 1;
+  }
+  
+    
+  class QueryCommon { 
+  
+    // query id 
+    long queryId = 1;
+    // results path 
+    ustring queryResultPath = 2;
+    // temp path 
+    ustring queryTempPath = 3;
+    // shard ids a particular host is responsible for processing 
+    vector<QueryInputSplit> relevantSplits = 5;
+  }
+
+  class PersistentQueryInfo [recordid] { 
+
+    long    queryId = 1;
+    ustring cannonicalQueryId = 3;
+  }
+  
+  class ClientQueryInfo {
+   
+    long      clientQueryId = 1;
+    ustring   sortByField = 3;
+    
+    enum SortOrder { 
+      ASCENDING =0;
+      DESCENDING = 1;
+    }
+            
+    int       sortOrder = 4;
+    int       paginationOffset = 5;
+    int       pageSize = 6;
+    long      maxAge = 7;
+  }
+  
+  class QueryStatus { 
+    long    queryId = 1;
+    int     shardId = 2;
+    int     attempts = 3;
+    long    lastAttemptTime = 4;
+    float   progress = 5;
+    int     status = 6;
+        
+    enum Status { 
+      PENDING = 0;
+      RUNNING = 1;
+      FINISHED = 2;
+      ERROR = 3;
+      CANCELLED = 4;      
+    }
+    
+    ustring optErrorReason = 7;
+    long     optResultCount = 8;
+  }
+
+
+
+
+  class RemoteQueryInfo { 
+    // common query info 
+    QueryCommon commonInfo = 1;    
+    // query  class type
+    ustring queryClassType = 2;
+    // query data class type
+    ustring queryDataClassType =3;
+    // query data 
+    buffer  queryDataBuffer = 4;
+    // client query details 
+    ClientQueryInfo clientQueryData = 5;
+    // shard id   
+    int shardId = 6; 
+  }
+  
+  class BaseConfig { 
+  
+    ustring fileSystem        = 1;
+    ustring queryResultsDir   = 3;
+    ustring slaveName = 6;
+  }
+  
+  class SlaveStatus { 
+    enum State { 
+      INITIALIZING = 1;
+      READY = 2;
+      ERROR=10;
+    }
+    
+    int       state = 1;
+    vector<QueryStatus> queryStatus = 2;
+  }
+  
+  class TestQueryData { 
+    ustring someData = 1;
+  }
+  
+  service QueryServerSlave {
+  
+    method initializeQuerySlave(in BaseConfig,out SlaveStatus);
+    
+    method doQuery(in RemoteQueryInfo, out QueryStatus);
+    
+    method cancelQuery(in QueryCommon, out NullMessage);
+    
+    method heartbeatQuerySlave(in NullMessage, out SlaveStatus);
+  }
+}
