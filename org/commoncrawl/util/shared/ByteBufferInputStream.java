@@ -44,9 +44,15 @@ public class ByteBufferInputStream extends FSInputStream {
     }
     else { 
       // Read only what's left
-      len = Math.min(len, _source.remaining());
-      _source.get(bytes, off, len);
-      return len;
+      if (len == 0)
+        return 0;
+      else if (_source.remaining() == 0) 
+        return -1;
+      else {
+        len = Math.min(len, _source.remaining());
+        _source.get(bytes, off, len);
+        return len;
+      }
     }
   }
 
