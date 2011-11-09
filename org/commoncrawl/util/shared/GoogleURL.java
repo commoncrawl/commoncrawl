@@ -72,6 +72,14 @@ public class GoogleURL {
     return _query.len >= 0;
   }
   
+  public int getQueryOffset() {
+    return _query.begin;
+  }
+  
+  public int getQueryLen() { 
+    return _query.len;
+  }
+  
   public boolean has_ref() {
     return _ref.len >= 0;
   }
