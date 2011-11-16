@@ -102,7 +102,11 @@ CLASSPATH=${CLASSPATH}:$JAVA_HOME/lib/tools.jar
 # next add commoncrawl jar FIRST ... 
 CLASSPATH=${CLASSPATH}:${CCAPP_JAR_PATH}/${CCAPP_JAR}
 # then add nested libraries in commoncrawl jar
-for f in ${CCAPP_HOME}/lib//*.jar; do
+for f in ${CCAPP_HOME}/lib/*.jar; do
+  CLASSPATH=${CLASSPATH}:$f;
+done
+# then add nested libraries in commoncrawl jar
+for f in ${CCAPP_HOME}/build/lib/*.jar; do
   CLASSPATH=${CLASSPATH}:$f;
 done
 #next add hadoop jar path 
