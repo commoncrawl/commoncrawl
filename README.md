@@ -27,6 +27,6 @@ how you can go about configuring our InputFormat. To run the BasicArcFileReaderS
 an ARC file in the corpus (2010/01/07/18/1262876244253_18.arc.gz for example), you would run 
 the following command line:
 
-  bin/launcher.sh org.commoncrawl.samples.BasicArcFileReaderSample <<AWS ACCESS KEY>>  <<AWS SECRET KEY>> commoncrawl-crawl-002 2010/01/07/18/1262876244253_18.arc.gz
+  bin/launcher.sh org.commoncrawl.samples.BasicArcFileReaderSample {AWS ACCESS KEY} {AWS SECRET KEY} commoncrawl-crawl-002 2010/01/07/18/1262876244253_18.arc.gz
 
 
