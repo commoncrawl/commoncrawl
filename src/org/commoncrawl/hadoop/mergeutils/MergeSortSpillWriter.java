@@ -42,6 +42,8 @@ import org.apache.hadoop.mapred.Reporter;
 import org.commoncrawl.hadoop.mergeutils.OptimizedKeyGeneratorAndComparator.OptimizedKey;
 import org.commoncrawl.util.shared.CCStringUtils;
 import org.commoncrawl.util.shared.FileUtils;
+import org.apache.hadoop.io.compress.CompressionCodec;
+
 /**
  * 
  * The workhorse of the library. This class (currently) implements SpillWriter and thus can accept
@@ -101,7 +103,7 @@ implements SpillWriter<KeyType,ValueType> {
 	Class<ValueType> _valueClass;
 	DataOutputStream _outputStream;
 	DataInputStream  _inputStream;
-	boolean _compressOutput = false;
+	CompressionCodec _compressionCodec;
 	Reporter _reporter;
 	int _spillIndexBufferSize = -1;
 	int _spillDataBufferSize  = -1;
@@ -119,7 +121,7 @@ implements SpillWriter<KeyType,ValueType> {
 	 * @param optCombiner
 	 * @param keyClass
 	 * @param valueClass
-	 * @param compressOutput
+	 * @param compressionCodec
 	 * @param reporter
 	 * @throws IOException
 	 */
@@ -132,11 +134,11 @@ implements SpillWriter<KeyType,ValueType> {
 			RawKeyValueComparator<KeyType,ValueType> comparator,
 			Class<KeyType> keyClass,
 			Class<ValueType> valueClass,
-			boolean compressOutput,
+			CompressionCodec compressionCodec,
 			Reporter reporter
 	) throws IOException {
 
-		init(conf,outputSpillWriter,tempDataFileSystem,tempDirectoryPath,comparator,null,optionalCombiner,keyClass,valueClass,compressOutput,reporter);
+		init(conf,outputSpillWriter,tempDataFileSystem,tempDirectoryPath,comparator,null,optionalCombiner,keyClass,valueClass,compressionCodec,reporter);
 	}
 
 	/**
@@ -150,7 +152,7 @@ implements SpillWriter<KeyType,ValueType> {
 	 * @param keyGenerator
 	 * @param keyClass
 	 * @param valueClass
-	 * @param compressOutput
+	 * @param compressionCodec
 	 * @param reporter
 	 * @throws IOException
 	 */
@@ -162,11 +164,11 @@ implements SpillWriter<KeyType,ValueType> {
 			OptimizedKeyGeneratorAndComparator<KeyType, ValueType> keyGenerator,
 			Class<KeyType> keyClass,
 			Class<ValueType> valueClass,
-			boolean compressOutput,
+			CompressionCodec compressionCodec,
 			Reporter reporter
 	) throws IOException {
 
-		init(conf,outputSpillWriter,tempDataFileSystem,tempDirectoryPath,null,keyGenerator,null,keyClass,valueClass,compressOutput,reporter);
+		init(conf,outputSpillWriter,tempDataFileSystem,tempDirectoryPath,null,keyGenerator,null,keyClass,valueClass,compressionCodec,reporter);
 	}
 
 
@@ -180,7 +182,7 @@ implements SpillWriter<KeyType,ValueType> {
 			SpillValueCombiner<KeyType,ValueType> optCombiner,
 			Class<KeyType> keyClass,
 			Class<ValueType> valueClass,
-			boolean compressOutput,
+			CompressionCodec compressionCodec,
 			Reporter reporter
 	) throws IOException { 
 
@@ -200,7 +202,7 @@ implements SpillWriter<KeyType,ValueType> {
 		_tempDataFileSystem.mkdirs(_temporaryDirectoryPath);
 		NUMBER_FORMAT.setMinimumIntegerDigits(5);
 		NUMBER_FORMAT.setGroupingUsed(false);
-		_compressOutput = compressOutput;
+		_compressionCodec = compressionCodec;
 		_reporter = reporter;
 		// ok look up buffer sizes 
 		_spillIndexBufferSize = _conf.getInt(SPILL_INDEX_BUFFER_SIZE_PARAM, DEFAULT_SPILL_INDEX_BUFFER_SIZE);
@@ -387,7 +389,7 @@ implements SpillWriter<KeyType,ValueType> {
 		}
 		else {
 			LOG.info("Writing spill output to temporary spill file:" + spillFilePath);
-			spillWriter = new SequenceFileSpillWriter<KeyType,ValueType>(_tempDataFileSystem,_conf,spillFilePath,_keyClass,_valueClass,null,_compressOutput,
+			spillWriter = new SequenceFileSpillWriter<KeyType,ValueType>(_tempDataFileSystem,_conf,spillFilePath,_keyClass,_valueClass,null,_compressionCodec,
 			    (short)_conf.getInt(SPILL_FILE_REPLICATION_FACTOR_PARAM, DEFAULT_REPLICATION_FACTOR));
 		}
 

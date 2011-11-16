@@ -201,7 +201,7 @@ public class TFileUtils {
   
   public static void main(String[] args) {
     // setup the basics ... 
-    logger = Logger.getLogger("org.commoncrawl");
+    Logger logger = Logger.getLogger("org.commoncrawl");
     logger.setLevel(Level.INFO);
     BasicConfigurator.configure();
     

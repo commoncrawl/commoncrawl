@@ -1,7 +1,5 @@
 package org.commoncrawl.util.shared;
 
-import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
-import it.unimi.dsi.fastutil.longs.LongSet;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -42,7 +40,7 @@ public class SimHash {
 
   public static long computeOptimizedSimHashForString(CharBuffer s) {
 
-    LongSet shingles = new LongOpenHashSet(Math.min(s.length(), 100000));
+    LongOpenHashSet shingles = new LongOpenHashSet(Math.min(s.length(), 100000));
 
     int length = s.length();
     for (int i = 0; i < length - FIXED_CGRAM_LENGTH + 1; i++) {
@@ -91,7 +89,7 @@ public class SimHash {
   
   public static long computeOptimizedSimHashForBytes(byte[] data,int offset,int length) {
 
-    LongSet shingles = new LongOpenHashSet(Math.min(length/FIXED_BGRAM_LENGTH, 100000));
+    LongOpenHashSet shingles = new LongOpenHashSet(Math.min(length/FIXED_BGRAM_LENGTH, 100000));
 
     for (int i = offset; i < length - FIXED_BGRAM_LENGTH + 1; i++) {
       int pos = i;

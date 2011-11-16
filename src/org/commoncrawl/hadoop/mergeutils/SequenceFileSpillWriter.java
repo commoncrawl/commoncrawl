@@ -34,8 +34,8 @@ import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.io.WritableComparable;
 import org.apache.hadoop.io.SequenceFile.CompressionType;
 import org.apache.hadoop.io.SequenceFile.ValueBytes;
-import org.apache.hadoop.io.compress.LzoCodec;
 import org.commoncrawl.util.shared.CCStringUtils;
+import org.apache.hadoop.io.compress.CompressionCodec;
 
 /**
  * 
@@ -84,7 +84,7 @@ implements RawDataSpillWriter<KeyType, ValueType> {
       Path outputFilePath, Class<KeyType> keyClass,
       Class<ValueType> valueClass,
       SequenceFileIndexWriter<KeyType, ValueType> optionalIndexWriter,
-      boolean compress,short replicationFactor) throws IOException {
+      CompressionCodec codec,short replicationFactor) throws IOException {
 
     _bufferQueue = new LinkedBlockingQueue<QueuedBufferItem>(
         conf.getInt(QUEUE_CAPACITY_PARAM,BUFFER_QUEUE_CAPACITY));
@@ -96,10 +96,7 @@ implements RawDataSpillWriter<KeyType, ValueType> {
     // assign index writer ..
     _indexWriter = optionalIndexWriter;
     
-    if (compress) {
-      // GzipCodec codec = new GzipCodec();
-      LzoCodec codec = new LzoCodec();
-
+    if (codec != null) {
       writer = SequenceFile.createWriter(conf, _outputStream, keyClass,
           valueClass, CompressionType.BLOCK, codec);
     } else {

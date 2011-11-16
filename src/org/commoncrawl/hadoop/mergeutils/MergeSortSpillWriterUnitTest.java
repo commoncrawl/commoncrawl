@@ -250,7 +250,7 @@ public class MergeSortSpillWriterUnitTest {
 
             return new MergeSortSpillWriter<IntWritable, Text>(conf, writer,
                 tempFileSystem, tempFilePath, null, comparator, keyClass, valueClass,
-                false, null);
+                null, null);
         }
     }
 
@@ -286,7 +286,7 @@ public class MergeSortSpillWriterUnitTest {
                         return OptimizedKey.KEY_TYPE_LONG;
                     }
 
-                }, keyClass, valueClass, false, null);
+                }, keyClass, valueClass, null, null);
         }
     }
 
@@ -347,7 +347,7 @@ public class MergeSortSpillWriterUnitTest {
 
                     }
 
-                }, keyClass, valueClass, false, null);
+                }, keyClass, valueClass, null, null);
         }
     }
 
@@ -406,7 +406,7 @@ public class MergeSortSpillWriterUnitTest {
 
                     }
 
-                }, keyClass, valueClass, false, null);
+                }, keyClass, valueClass, null, null);
         }
     }
 

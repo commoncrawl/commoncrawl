@@ -36,6 +36,10 @@ import org.commoncrawl.util.shared.FPGenerator;
 import org.commoncrawl.util.shared.FileUtils;
 import org.commoncrawl.util.shared.FlexBuffer;
 import org.commoncrawl.util.shared.Tuples.Pair;
+import org.apache.hadoop.io.compress.CompressionCodec;
+import org.apache.hadoop.io.compress.DefaultCodec;
+import org.apache.hadoop.util.ReflectionUtils;
+
 
 
 
@@ -173,11 +177,18 @@ public abstract class Query<DataType extends RPCStruct,ResultKeyType extends Wri
       @Override
       public void run() {
         try {
-          LOG.info(fqHostName + " Creating SpillWriter with output file:" + shardDataFile +" for Query:" + getQueryId());
+		  
+          CompressionCodec codec = null;
+          Class<? extends CompressionCodec> codecClass = conf.getClass("mapred.output.compression.codec", null, CompressionCodec.class);
+          if (codecClass != null) {
+            codec = ReflectionUtils.newInstance(codecClass,conf);
+          }
+		
+          LOG.info(fqHostName + " Creating SpillWriter with output file:" + shardDataFile +" for Query:" + getQueryId() + " Codec is:" + codecClass);
           SequenceFileSpillWriter<ResultKeyType, ResultValueType> finalSpillWriter = new SequenceFileSpillWriter<ResultKeyType, ResultValueType>(
               remoteFileSystem,
               conf,
-              shardDataFile, getKeyClass(), getValueClass(), null, true,(short)2);
+              shardDataFile, getKeyClass(), getValueClass(), null, codec,(short)2);
           
           LOG.info(fqHostName + " Creating MergingSpillWriter at:" + hdfsAttemptPath + " for Query:" + getQueryId());
           
@@ -192,7 +203,7 @@ public abstract class Query<DataType extends RPCStruct,ResultKeyType extends Wri
                 allocateRawComparator(), 
                 getKeyClass(), 
                 getValueClass(), 
-                false, 
+                null, 
                 null);
             
             try { 
@@ -861,7 +872,7 @@ public abstract class Query<DataType extends RPCStruct,ResultKeyType extends Wri
    
     return new SequenceFileSpillWriter<ResultKeyType, ResultValueType>(remoteFileSystem,conf,mergeResultsPath,getKeyClass(),getValueClass(),
         new QueryResultFileIndex.PositionBasedIndexWriter(remoteFileSystem,QueryResultFileIndex.getIndexNameFromBaseName(mergeResultsPath))
-        ,false,(short)2);
+        ,null,(short)2);
   }
       
   private long _aggregationCompletionCount = 0L;
