@@ -75,7 +75,7 @@
     </fileset>
     <fileset dir="${hadoop.path}">
       <include name="lib/**/*.jar"/>
-      <include name="hadoop-core-*.jar"/>
+      <include name="hadoop-core*.jar"/>
       <exclude name="lib/jets3t-*.jar"/>
     </fileset>
   </path>
