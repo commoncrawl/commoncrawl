@@ -238,8 +238,11 @@ public class JetS3tARCSource extends ARCSplitCalculator implements ARCSource,
       Map<String, ARCResource> resources = new HashMap<String, ARCResource>();
       for (String prefix : getInputPrefixes(job)) {
         for (S3Object object : service.listObjects(bucket, prefix, null)) {
-          String key = object.getKey();
-          resources.put(key, new ARCResource(key, object.getContentLength()));
+          long length = object.getContentLength();
+          if (length > 0) {
+            String key = object.getKey();
+            resources.put(key, new ARCResource(key, length));
+          }
         }
       }
       return resources.values();
