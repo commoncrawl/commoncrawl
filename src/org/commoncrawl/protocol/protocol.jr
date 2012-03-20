@@ -1,0 +1,27 @@
+module org.commoncrawl.protocol {
+
+  // data structure describing the location of 
+  // a document within the s3 document cache
+  class ArchiveInfo { 
+    vlong arcfileDate    = 1; // date arc file was generated (used to construct arc file name)
+    vint  arcfileIndex   = 2; // part number of arc file (used to construct arc file name) 
+    vint  arcfileOffset  = 3; // offset into the arc file where document data resides 
+    vint  compressedSize = 4; // compressed size of document data     
+    vint  crawlNumber    = 5;  // OBSOLETE 
+    vint  documentVersion = 6; // OBSOLETE
+    vint  parseSegmentId  = 7; // OBSOLETE
+    buffer signature = 8; 	   // md5 signature of document 
+    vlong simhash = 9;		   // optional simhash if document was text	
+    ustring cacheItemSrc = 10; // OBSOLETE
+  }
+
+  // data structure used to represent raw output in SequenceFiles
+  class ParseOutput { 
+     ustring normalizedMimeType = 3;
+     ustring hostIPAddress = 4;
+     long    fetchTime = 5;
+     ustring headers = 8;	 // HTTP Headers 
+     buffer  rawContent = 9; // Raw  Content - Never Compressed
+  }
+  
+}
