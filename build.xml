@@ -8,23 +8,14 @@
   <property file="${basedir}/build.properties" />
   <property name="Name" value="commoncrawl"/>
   <property name="name" value="commoncrawl"/>
-  <property name="version" value="1.0"/>
+  <property name="version" value="1.1"/>
   <property name="final.name" value="${name}-${commoncrawl.version}"/>  
 
   <property name="commoncrawl.groupid" value="org.commoncrawl"/>
 
   <property name="mvn.repo" value="http://repo1.maven.org/maven2"/>
   <property name="apache.repo" value="https://repository.apache.org/content/repositories/releases"/>
-
-  <fail message="Please define Hadoop Base Path via hadoop.path in your build.properties file">
-    <condition>
-      <not>
-        <isset property="hadoop.path"/>
-      </not>
-    </condition>
-  </fail>
-
-  <property name="src.dir" value="${basedir}/src"/>
+  <property name="src.dir" value="${basedir}/src/main/java"/>
   <property name="lib.dir" value="${basedir}/lib"/>
   <property name="conf.dir" value="${basedir}/conf"/>
   
@@ -77,11 +68,6 @@
 	  <exclude name="servlet-api-2.5-6.1.14.jar"/>
 	  <exclude name="servlet-api-2.5.jar"/>
     </fileset>
-    <fileset dir="${hadoop.path}">
-      <include name="lib/**/*.jar"/>
-      <include name="hadoop-core*.jar"/>
-      <exclude name="lib/jets3t-*.jar"/>
-    </fileset>
   </path>
 
   <target name="setup.init">
@@ -107,7 +93,7 @@
   <target name="mvn.ant.tasks.download" depends="setup.init,mvn.ant.tasks.check,proxy" unless="mvn.ant.tasks.found">
     <property name="mvn.ant.task.version" value="2.1.3"/>
     <property name="mvn.ant.task.jar" value="maven-ant-tasks-${mvn.ant.task.version}.jar"/>
-    <property name="mvn.ant.task.url" value="http://mirror.uoregon.edu/apache/maven/ant-tasks/2.1.3/binaries"/>
+	<property name="mvn.ant.task.url" value="http://mirror.uoregon.edu/apache/maven/ant-tasks/2.1.3/binaries"/>
     <get src="${mvn.ant.task.url}/${mvn.ant.task.jar}" dest="${build.tools.dir}/${mvn.ant.task.jar}" usetimestamp="true"/>
   </target>
 
@@ -442,6 +428,7 @@
 		<dependency groupId="junit" artifactId="junit" version="4.10"/>
 		<dependency groupId="org.apache.thrift" artifactId="libthrift" version="0.7.0"/>
 		<dependency groupId="log4j" artifactId="log4j" version="1.2.14"/>
+		<dependency groupId="org.apache.hadoop" artifactId="hadoop-core" version="1.0.3" />
 	  </artifact:pom>
 
 	  <!-- Generate the pom file -->

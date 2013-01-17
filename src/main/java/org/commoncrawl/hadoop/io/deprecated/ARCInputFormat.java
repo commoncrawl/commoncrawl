@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package org.commoncrawl.hadoop.io;
+package org.commoncrawl.hadoop.io.deprecated;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -27,7 +27,6 @@ import org.apache.hadoop.mapred.JobConfigurable;
 import org.apache.hadoop.mapred.RecordReader;
 import org.apache.hadoop.mapred.Reporter;
 import org.apache.hadoop.util.ReflectionUtils;
-import org.commoncrawl.util.shared.ArcFileReader;
 
 /**
  * A map reduce input format for gzipped ARC files.
@@ -179,7 +178,7 @@ public class ARCInputFormat implements InputFormat, JobConfigurable {
    */
   public RecordReader getRecordReader(InputSplit split, JobConf job,
       Reporter reporter) throws IOException {
-    return new ARCSplitReader(job, (ARCSplit) split, arcSource, blockSize);
+    return new 	ARCSplitReader(job, (ARCSplit) split, arcSource, blockSize);
   }
 
   /**

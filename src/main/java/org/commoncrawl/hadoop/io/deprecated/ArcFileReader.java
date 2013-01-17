@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package org.commoncrawl.util.shared;
+package org.commoncrawl.hadoop.io.deprecated;
 
 import java.io.BufferedReader;
 import java.io.EOFException;

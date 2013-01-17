@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package org.commoncrawl.hadoop.io;
+package org.commoncrawl.hadoop.io.deprecated;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -32,7 +32,6 @@ import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.RecordReader;
 import org.apache.hadoop.util.StringUtils;
 import org.commoncrawl.protocol.shared.ArcFileItem;
-import org.commoncrawl.util.shared.ArcFileReader;
 
 /**
  * A Hadooop {@link RecordReader} for reading {@link ARCSplit}s.

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package org.commoncrawl.hadoop.io;
+package org.commoncrawl.hadoop.io.deprecated;
 
 import java.io.DataInput;
 import java.io.DataOutput;
