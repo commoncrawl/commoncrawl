@@ -19,6 +19,20 @@
   <property name="lib.dir" value="${basedir}/lib"/>
   <property name="conf.dir" value="${basedir}/conf"/>
   
+  
+  <property name="doc.javadoc.dir" value="${basedir}/doc/javadoc" />
+  <property name="javadoc.link.java"
+		value="http://download.oracle.com/javase/6/docs/api/"/>
+	
+  <property name="javadoc.link.hadoop"
+		value="http://hadoop.apache.org/common/docs/current/api/"/>
+		
+   <property name="javadoc.link.fastutil"
+		value="http://fastutil.dsi.unimi.it/docs/"/>
+   
+   <property name="javadoc.link.log4j"
+		value="http://logging.apache.org/log4j/1.2/apidocs/"/>
+		
   <property name="build.dir" value="${basedir}/build"/>
   <property name="build.native" value="${basedir}/build"/>
   <property name="build.classes" value="${build.dir}/classes"/>
@@ -391,6 +405,32 @@
 
       </jar>
     </target>
+    
+    <!-- ================================================================== -->
+    <!-- Javadoc.  Generate javadoc documentation                           -->
+    <!-- ================================================================== -->
+	<target name="javadoc" description="Generate javadoc">
+		<mkdir dir="${doc.javadoc.dir}"/>
+		 <javadoc
+			destdir="${doc.javadoc.dir}"
+			sourcepath="${src.dir}"
+			packagenames="org.commoncrawl.*"
+			author="true"
+			version="true"
+			use="true"
+			windowtitle="${Name} ${version} API"
+			doctitle="${Name} ${version} API"
+			failonerror="true"
+		>
+			<classpath refid="classpath" />
+			<link href="${javadoc.link.java}"/>
+			<link href="${javadoc.link.hadoop}"/>
+			<link href="${javadoc.link.fastutil}"/>
+			<link href="${javadoc.link.log4j}"/>
+			<group title="CommonCrawl ${version}" packages="org.commoncrawl.*"/>
+		</javadoc>	
+	</target>
+
 
     <!-- ================================================================== -->
     <!-- Clean.  Delete the build files, and their directories              -->
@@ -399,6 +439,7 @@
 	<echo message="Processing Clean Target"/>                                        
     <target name="clean">
       <delete dir="${build.dir}"/>
+      <delete dir="${doc.javadoc.dir}"/>
 	  <delete> 
 		<fileset dir="${src.dir}" includes="**\/gen.stamp" /> 
 	  </delete>
