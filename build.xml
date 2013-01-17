@@ -107,7 +107,7 @@
   <target name="mvn.ant.tasks.download" depends="setup.init,mvn.ant.tasks.check,proxy" unless="mvn.ant.tasks.found">
     <property name="mvn.ant.task.version" value="2.1.3"/>
     <property name="mvn.ant.task.jar" value="maven-ant-tasks-${mvn.ant.task.version}.jar"/>
-    <property name="mvn.ant.task.url" value="http://mirror.uoregon.edu/apache/maven/binaries"/>
+    <property name="mvn.ant.task.url" value="http://mirror.uoregon.edu/apache/maven/ant-tasks/2.1.3/binaries"/>
     <get src="${mvn.ant.task.url}/${mvn.ant.task.jar}" dest="${build.tools.dir}/${mvn.ant.task.jar}" usetimestamp="true"/>
   </target>
 
