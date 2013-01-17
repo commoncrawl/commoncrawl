@@ -26,7 +26,6 @@
   <property name="build.tools.dir" location="${build.dir}/tools"/>
   <property name="build.lib.dir" location="${build.dir}/lib"/>
   <property name="build.test.dir" location="${build.dir}/test"/>
-  <property name="thrift.src" value="${build.dir}/gen-java"/>
   <property name="build.webapps" value="${build.dir}/webapps"/>
   <property name="build.anttasks" value="${build.dir}/ant"/>
   <!-- convert spaces to _ so that mac os doesn't break things -->
@@ -45,7 +44,7 @@
   <property name="javac.debug" value="on"/>
   <property name="javac.optimize" value="on"/>
   <property name="javac.deprecation" value="off"/>
-  <property name="javac.version" value="1.5"/>
+  <property name="javac.version" value="1.6"/>
   <property name="javac.args" value=""/>
   <property name="javac.args.warnings" value=""/>
   <!-- native make support -->
@@ -151,31 +150,6 @@
       			<classpath refid="classpath" />
     		</taskdef>
   		</target>
-
-	<!-- ====================================================== -->
-	<!-- Compile Thrift RPC Compiler Task	                    -->
-	<!-- ====================================================== -->
-	<echo message="Processing Compile-ThriftRCC Target"/>        
-		<target name="compile-thrift-rcc-compiler" depends="init">
-    		<javac 
-	           encoding="${build.encoding}" 
-	           srcdir="${src.dir}"
-	           includes="org/commoncrawl/rpc/thriftrpc/ant/*.java"
-	           destdir="${build.classes}"
-	           debug="${javac.debug}"
-	           optimize="${javac.optimize}"
-	           target="${javac.version}"
-	           source="${javac.version}"
-			   includeantruntime="no"
-	           deprecation="${javac.deprecation}">
-      			<compilerarg line="${javac.args}"/>
-      			<classpath refid="classpath"/>
-    		</javac>
-    		<taskdef name="thrift-recordcc" classname="org.commoncrawl.rpc.thriftrpc.ant.RccTask">
-      			<classpath refid="classpath" />
-    		</taskdef>
-  		</target>
-
   
 	<!-- ====================================================== -->
 	<!-- Generate Records / Service Definitions                 -->
@@ -195,54 +169,11 @@
     		</recordcc>
   		</target>
 
-		<!-- ====================================================== -->
-		<!-- Generate Thrift Records / Service Definitions                 -->
-		<!-- ====================================================== -->
-
-		<!-- CHECK THRIFT GEN TIMESTAMP  -->
-		<uptodate property="thrift.records.uptodate" targetfile="${build.src}/thrift.gen.timestamp" >
-		  <!-- ADD THRIFT FILES HERE -->		
-		  <srcfiles dir= "${basedir}/src/org/commoncrawl/rpc/thriftrpc/" includes="thriftRPCTest.thrift"/>
-		</uptodate>
-
-		<target name="gen-thrift-records" depends="init" unless="${thrift.records.uptodate}" if="compile.thrift">			
-	     <echo>Generating Thrift Java code from ${basedir}/src/org/commoncrawl/rpc/thriftrpc/ ....</echo>
-	     <exec executable="thrift" dir="${basedir}/src/org/commoncrawl/rpc/thriftrpc/" failonerror="yes">
-	       <arg line="--gen java:hashcode" />
-		   <arg line="-o ${build.dir}" />
-	       <arg value="thriftRPCTest.thrift" />
-	     </exec>
-		 <!-- compile classes -->
- 		 <javac 
-	           encoding="${build.encoding}" 
-	           srcdir="${build.dir}"
-	           includes="gen-java/**/*.java"
-			   excludes=""
-	           destdir="${build.classes}"
-	           debug="${javac.debug}"
-	           optimize="${javac.optimize}"
-	           target="${javac.version}"
-	           source="${javac.version}"
-			   includeantruntime="no"
-	           deprecation="${javac.deprecation}">
-   			<compilerarg line="${javac.args}"/>
-   			<classpath refid="classpath"/>
- 		</javac>
-		<touch file="${build.src}/thrift.gen.timestamp"/>
-		</target>
-		<echo message="Generate Thrift RPC Target "/>
-		<target name="gen-thrift-rpc" depends="init,compile-thrift-rcc-compiler,gen-thrift-records" if="compile.thrift">
-			<thrift-recordcc destdir="${build.src}" language="java">
-	   	    	<fileset dir="${src.dir}" includes="**/*.thrift" /> 
-			</thrift-recordcc>
-		</target>
-					
-
     <!-- ====================================================== -->
     <!-- Compile the Java files                                 -->
     <!-- ====================================================== -->
     <echo message="Processing Compile Core Classes Target"/>                
-    <target name="compile-core-classes" depends="init,gen-records,gen-thrift-rpc">
+    <target name="compile-core-classes" depends="init,gen-records">
     
       <!-- Compile Java files (excluding JSPs) checking warnings -->
       <javac 
@@ -268,28 +199,9 @@
                  />
       </copy>
     </target>
-
-    <echo message="Processing Thrift Classes Target"/>                
-    <target name="compile-thrift-classes" depends="init,gen-records,gen-thrift-rpc" if="compile.thrift">
-      <!-- Compile Java files (excluding JSPs) checking warnings -->
-      <javac 
-             encoding="${build.encoding}" 
-             srcdir="${thrift.src}"
-             includes="**/*.java" 
-             destdir="${build.classes}"
-             debug="${javac.debug}"
-             optimize="${javac.optimize}"
-             target="${javac.version}"
-             source="${javac.version}"
-			 includeantruntime="no"
-             deprecation="${javac.deprecation}" >
-        <compilerarg line="${javac.args} ${javac.args.warnings}" />
-        <classpath refid="classpath"/>
-      </javac>   
-    </target>
     
 	<echo message="Processing Compile Core Target"/>                    
-    <target name="compile-core" depends="compile-core-classes,compile-thrift-classes">
+    <target name="compile-core" depends="compile-core-classes">
     </target>
     
 	<echo message="Processing Compile Target"/>                        
@@ -426,7 +338,6 @@
 		<dependency groupId="org.mortbay.jetty" artifactId="jetty-util" version="6.1.26"/>
 		<dependency groupId="org.mortbay.jetty" artifactId="jsp-2.1" version="6.1.14"/>
 		<dependency groupId="junit" artifactId="junit" version="4.10"/>
-		<dependency groupId="org.apache.thrift" artifactId="libthrift" version="0.7.0"/>
 		<dependency groupId="log4j" artifactId="log4j" version="1.2.14"/>
 		<dependency groupId="org.apache.hadoop" artifactId="hadoop-core" version="1.0.3" />
 	  </artifact:pom>
@@ -489,15 +400,13 @@
     <target name="clean">
       <delete dir="${build.dir}"/>
 	  <delete> 
-		  <fileset dir="${src.dir}" includes="**\/gen.stamp" /> 
-		<fileset dir="${src.dir}" includes="**\/thrift-gen.stamp" />           
+		<fileset dir="${src.dir}" includes="**\/gen.stamp" /> 
 	  </delete>
     </target>
 	<echo message="Clean Genereated Target"/>                                        
     <target name="clean-gen">
 	  <delete> 
-		  <fileset dir="${src.dir}" includes="**\/gen.stamp" /> 
-		<fileset dir="${src.dir}" includes="**\/thrift-gen.stamp" />           
+		 <fileset dir="${src.dir}" includes="**\/gen.stamp" /> 
 	  </delete>
     </target>
 
