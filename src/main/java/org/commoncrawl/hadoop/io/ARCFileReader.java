@@ -18,12 +18,15 @@ package org.commoncrawl.hadoop.io;
 
 import java.io.BufferedReader;
 import java.io.EOFException;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.PushbackInputStream;
 import java.io.SequenceInputStream;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.text.SimpleDateFormat;
@@ -39,11 +42,17 @@ import java.util.zip.InflaterInputStream;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FSDataInputStream;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.LocalFileSystem;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.hadoop.io.Text;
 import org.commoncrawl.crawl.common.shared.Constants;
 import org.commoncrawl.io.shared.NIOHttpHeaders;
+import org.commoncrawl.util.shared.ByteArrayUtils;
 
 /**
  * Reads an ARC File via an InputStream, and returns the decompressed content as ArcFileItems
@@ -734,6 +743,33 @@ public final class ARCFileReader extends InflaterInputStream {
       }
     }
   }
-
+  
+  public static void main(String[] args)throws IOException, URISyntaxException {
+    
+    Configuration conf = new Configuration();
+    URI uri =  new URI(args[0]);
+    FileSystem fs = FileSystem.get(uri,conf);
+    FSDataInputStream stream = fs.open(new Path(uri));
+    
+    try { 
+      ARCFileReader reader = new ARCFileReader(stream);
+      
+      Text key = new Text();
+      BytesWritable value = new BytesWritable();
+      
+      while (reader.hasMoreItems()) {
+        reader.getNextItem(key, value);
+        int indexOfTrailingCRLF = ByteArrayUtils.indexOf(value.getBytes(), 0, value.getLength(), "\r\n\r\n".getBytes());
+        int headerLen = indexOfTrailingCRLF + 4;
+        int contentLen = value.getLength() - headerLen;
+        
+        String outputStr = "Key:" + key.toString() + " HeaderLen:" + headerLen + " ContentLen:" + contentLen;
+        System.out.println(outputStr);
+      }
+    }
+    finally { 
+      stream.close();
+    }
+  }
 
 }
