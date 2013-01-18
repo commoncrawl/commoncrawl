@@ -30,7 +30,6 @@ import java.net.URISyntaxException;
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.Vector;
 import java.util.regex.Matcher;
@@ -48,7 +47,6 @@ import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.OptionBuilder;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
-import org.apache.commons.io.IOUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -62,7 +60,6 @@ import org.commoncrawl.crawl.common.shared.Constants;
 import org.commoncrawl.io.shared.NIOHttpHeaders;
 import org.commoncrawl.util.shared.ByteArrayUtils;
 import org.commoncrawl.util.shared.CCStringUtils;
-import org.commoncrawl.util.shared.HexDump;
 
 /**
  * Reads an ARC File via an InputStream, and returns the decompressed content as ArcFileItems
