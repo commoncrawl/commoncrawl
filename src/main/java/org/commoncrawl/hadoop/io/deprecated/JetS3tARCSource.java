@@ -202,7 +202,7 @@ public class JetS3tARCSource extends ARCSplitCalculator implements ARCSource,
           awsSecretAccessKey);
       service = new RestS3Service(awsCredentials);
       // enable requester pays feature flag
-      service.setRequesterPaysEnabled(true);
+      //service.setRequesterPaysEnabled(true);
       bucket = new S3Bucket(bucketName);
 
       maxTries = job.getInt(P_MAX_TRIES, 4);

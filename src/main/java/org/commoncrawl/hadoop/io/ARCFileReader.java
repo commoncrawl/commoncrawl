@@ -30,6 +30,7 @@ import java.net.URISyntaxException;
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.Vector;
 import java.util.regex.Matcher;
@@ -39,13 +40,20 @@ import java.util.zip.CheckedInputStream;
 import java.util.zip.Inflater;
 import java.util.zip.InflaterInputStream;
 
+
+import org.apache.commons.cli.CommandLine;
+import org.apache.commons.cli.CommandLineParser;
+import org.apache.commons.cli.GnuParser;
+import org.apache.commons.cli.HelpFormatter;
+import org.apache.commons.cli.OptionBuilder;
+import org.apache.commons.cli.Options;
+import org.apache.commons.cli.ParseException;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.LocalFileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.DataOutputBuffer;
@@ -53,6 +61,8 @@ import org.apache.hadoop.io.Text;
 import org.commoncrawl.crawl.common.shared.Constants;
 import org.commoncrawl.io.shared.NIOHttpHeaders;
 import org.commoncrawl.util.shared.ByteArrayUtils;
+import org.commoncrawl.util.shared.CCStringUtils;
+import org.commoncrawl.util.shared.HexDump;
 
 /**
  * Reads an ARC File via an InputStream, and returns the decompressed content as ArcFileItems
@@ -166,31 +176,34 @@ public final class ARCFileReader extends InflaterInputStream {
 
   private void readARCHeader() throws IOException {
 
-    readHeader();
-
-    byte accumBuffer[] = new byte[4096];
-
-    int accumAmount = 0;
-    int readAmt = 0;
-
-    while ((readAmt = this.read(accumBuffer, accumAmount, accumBuffer.length
-        - accumAmount)) > 0) {
-      accumAmount += readAmt;
-      if (accumAmount == accumBuffer.length) {
+    if (readHeader()) { 
+      byte accumBuffer[] = new byte[4096];
+  
+      int accumAmount = 0;
+      int readAmt = 0;
+  
+      while ((readAmt = this.read(accumBuffer, accumAmount, accumBuffer.length
+          - accumAmount)) > 0) {
+        accumAmount += readAmt;
+        if (accumAmount == accumBuffer.length) {
+          throw new IOException("Invalid ARC File Header");
+        }
+      }
+  
+      if (readAmt == 0 || accumAmount == 0) {
         throw new IOException("Invalid ARC File Header");
+      } else {
+        // calculate header crc ...
+        _crc.reset();
+        _crc.update(accumBuffer, 0, accumAmount);
+        // validate crc and header length ...
+        readTrailer();
+        // and decode header string ...
+        _arcFileHeader = new String(accumBuffer, 0, accumAmount, "ISO-8859-1");
       }
     }
-
-    if (readAmt == 0 || accumAmount == 0) {
-      throw new IOException("Invalid ARC File Header");
-    } else {
-      // calculate header crc ...
-      _crc.reset();
-      _crc.update(accumBuffer, 0, accumAmount);
-      // validate crc and header length ...
-      readTrailer();
-      // and decode header string ...
-      _arcFileHeader = new String(accumBuffer, 0, accumAmount, "ISO-8859-1");
+    else { 
+      throw new IOException("Unable to Read ARCFile Header!");
     }
   }
 
@@ -214,51 +227,49 @@ public final class ARCFileReader extends InflaterInputStream {
    */
   private boolean readHeader() throws IOException {
 
-    if (in.available() != 0) {
+    CheckedInputStream in = new CheckedInputStream(this.in, _crc);
 
-      CheckedInputStream in = new CheckedInputStream(this.in, _crc);
+    _crc.reset();
 
-      _crc.reset();
-
-      try {
-        // Check header magic
-        if (readUShort(in) != GZIP_MAGIC) {
-          throw new IOException("Not in GZIP format");
-        }
-        // Check compression method
-        if (readUByte(in) != 8) {
-          throw new IOException("Unsupported compression method");
-        }
-        // Read flags
-        int flg = readUByte(in);
-        // Skip MTIME, XFL, and OS fields
-        skipBytes(in, 6);
-        // Skip optional extra field
-        if ((flg & FEXTRA) == FEXTRA) {
-          skipBytes(in, readUShort(in));
-        }
-        // Skip optional file name
-        if ((flg & FNAME) == FNAME) {
-          while (readUByte(in) != 0)
-            ;
-        }
-        // Skip optional file comment
-        if ((flg & FCOMMENT) == FCOMMENT) {
-          while (readUByte(in) != 0)
-            ;
-        }
-        // Check optional header CRC
-        if ((flg & FHCRC) == FHCRC) {
-          int v = (int) _crc.getValue() & 0xffff;
-          if (readUShort(in) != v) {
-            throw new IOException("Corrupt GZIP header");
-          }
-        }
-        return true;
-      } catch (EOFException e) {
+    try {
+      // Check header magic
+      if (readUShort(in) != GZIP_MAGIC) {
+        throw new IOException("Not in GZIP format");
       }
+      // Check compression method
+      if (readUByte(in) != 8) {
+        throw new IOException("Unsupported compression method");
+      }
+      // Read flags
+      int flg = readUByte(in);
+      // Skip MTIME, XFL, and OS fields
+      skipBytes(in, 6);
+      // Skip optional extra field
+      if ((flg & FEXTRA) == FEXTRA) {
+        skipBytes(in, readUShort(in));
+      }
+      // Skip optional file name
+      if ((flg & FNAME) == FNAME) {
+        while (readUByte(in) != 0)
+          ;
+      }
+      // Skip optional file comment
+      if ((flg & FCOMMENT) == FCOMMENT) {
+        while (readUByte(in) != 0)
+          ;
+      }
+      // Check optional header CRC
+      if ((flg & FHCRC) == FHCRC) {
+        int v = (int) _crc.getValue() & 0xffff;
+        if (readUShort(in) != v) {
+          throw new IOException("Corrupt GZIP header");
+        }
+      }
+      return true;
+    } catch (EOFException e) {
+      LOG.error(CCStringUtils.stringifyException(e));
     }
-    return false;
+    return false; 
   }
 
   /*
@@ -743,11 +754,50 @@ public final class ARCFileReader extends InflaterInputStream {
       }
     }
   }
+
+  static Options options = new Options();
+  static { 
+    
+    options.addOption(
+        OptionBuilder.withArgName("conf").hasArg().withDescription("Config File Name").create("conf"));
+    
+    options.addOption(
+        OptionBuilder.withArgName("file").hasArg().withDescription("ARC File Path").isRequired().create("file"));
+
+  }
+  
+  static void printUsage() { 
+    HelpFormatter formatter = new HelpFormatter();
+    formatter.printHelp( "ARCFileReaer", options );
+  }
   
   public static void main(String[] args)throws IOException, URISyntaxException {
     
     Configuration conf = new Configuration();
-    URI uri =  new URI(args[0]);
+
+    String path = null;
+    
+    CommandLineParser parser = new GnuParser();
+    
+    try { 
+      // parse the command line arguments
+      CommandLine cmdLine = parser.parse( options, args );
+      
+      // get ARCFile Path
+      path = cmdLine.getOptionValue("file");
+      
+      // get optional config 
+      if (cmdLine.hasOption("conf")) { 
+        conf.addResource(new Path(cmdLine.getOptionValue("conf")));
+      }
+    }
+    catch (ParseException e) { 
+      System.out.println(e.toString());
+      printUsage();
+      System.exit(1);
+    }
+    
+    URI uri =  new URI(path);
     FileSystem fs = FileSystem.get(uri,conf);
     FSDataInputStream stream = fs.open(new Path(uri));
     

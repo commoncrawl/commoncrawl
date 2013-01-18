@@ -333,7 +333,7 @@
 		<dependency groupId="dom4j" artifactId="dom4j" version="1.6.1"/>
 		<dependency groupId="com.google.code.gson" artifactId="gson" version="1.7.2"/>
 		<dependency groupId="com.google.guava" artifactId="guava" version="10.0.1"/>
-		<dependency groupId="net.java.dev.jets3t" artifactId="jets3t" version="0.8.1"/>
+		<dependency groupId="net.java.dev.jets3t" artifactId="jets3t" version="0.6.1"/>
 		<dependency groupId="org.mortbay.jetty" artifactId="jetty" version="6.1.26"/>
 		<dependency groupId="org.mortbay.jetty" artifactId="jetty-util" version="6.1.26"/>
 		<dependency groupId="org.mortbay.jetty" artifactId="jsp-2.1" version="6.1.14"/>
