@@ -8,6 +8,7 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
 import java.util.Random;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.zip.GZIPOutputStream;
 
 import junit.framework.Assert;
@@ -403,8 +404,14 @@ public class ArcFileReaderTests {
       os.flush();
       os.close();
       
+      final AtomicBoolean streamClosed = new AtomicBoolean();
       // setup ArcFileReader to read the file 
-      DataInputBuffer in = new DataInputBuffer();
+      DataInputBuffer in = new DataInputBuffer() { 
+        public void close() throws IOException {
+          super.close();
+          streamClosed.set(true);
+        }
+      };
       in.reset(os.getData(),os.getLength());
       ARCFileReader reader = new ARCFileReader(in);
       int index = 0;
@@ -441,6 +448,7 @@ public class ArcFileReaderTests {
       reader.close();
       
       Assert.assertEquals(index,BASIC_TEST_RECORD_COUNT);
+      Assert.assertTrue(streamClosed.get());
     }
     catch (IOException e) { 
       e.printStackTrace();

@@ -8,13 +8,14 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.s3native.NativeS3FileSystem;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.InputSplit;
 import org.apache.hadoop.mapreduce.RecordReader;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.lib.input.FileSplit;
-import org.commoncrawl.protocol.shared.ArcFileItem;
+import org.jets3t.service.Jets3tProperties;
 
 /** 
  * Reads an ARCFile whose location is spcified via a FileInputSplit
@@ -42,6 +43,10 @@ public class ARCFileRecordReader extends RecordReader<Text, BytesWritable>{
     conf = context.getConfiguration();    
     Path path = fileSplit.getPath();
     FileSystem fs = path.getFileSystem(conf);
+    if (fs instanceof NativeS3FileSystem) { 
+      Jets3tProperties properties = Jets3tProperties.getInstance(org.jets3t.service.Constants.JETS3T_PROPERTIES_FILENAME);
+      properties.setProperty("s3service.https-only","false");
+    }
     in = fs.open(path);
     reader = new ARCFileReader(in);
     start = fileSplit.getStart();
@@ -77,6 +82,11 @@ public class ARCFileRecordReader extends RecordReader<Text, BytesWritable>{
 
   @Override
   public void close() throws IOException {
-    reader.close();
+    try { 
+      reader.close();
+    }
+    finally { 
+      in.close();
+    }
   }
 }
