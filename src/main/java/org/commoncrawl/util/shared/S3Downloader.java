@@ -1,19 +1,20 @@
 /**
- * Copyright 2008 - CommonCrawl Foundation
+* Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  * 
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the GNU General Public License as published by
- *    the Free Software Foundation, either version 3 of the License, or
- *    (at your option) any later version.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    GNU General Public License for more details.
- *
- *    You should have received a copy of the GNU General Public License
- *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  **/
 
 package org.commoncrawl.util.shared;
@@ -29,6 +30,7 @@ import java.util.Map;
 import java.util.TimeZone;
 import java.util.TreeMap;
 import java.util.Vector;
+import java.util.concurrent.Semaphore;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -39,6 +41,8 @@ import org.commoncrawl.io.internal.NIOBufferList;
 import org.commoncrawl.io.internal.NIOHttpConnection;
 import org.commoncrawl.io.internal.NIOHttpConnection.State;
 import org.commoncrawl.io.shared.NIOHttpHeaders;
+
+import com.google.common.collect.Lists;
 
 
 /**
@@ -76,7 +80,7 @@ public class S3Downloader implements NIOHttpConnection.Listener {
 
   public static interface Callback { 
     public boolean downloadStarting(int itemId,String itemKey,int contentLength);
-    public boolean contentAvailable(int itemId,String itemKey,NIOBufferList contentBuffer);
+    public boolean contentAvailable(NIOHttpConnection theConnection,int itemId,String itemKey,NIOBufferList contentBuffer);
     public void downloadFailed(int itemId,String itemKey,String errorCode);
     public void downloadComplete(int itemId,String itemKey);
   }
@@ -87,6 +91,10 @@ public class S3Downloader implements NIOHttpConnection.Listener {
     _s3SecretKey = s3SecretKey;
     _isRequesterPays = isRequesterPays;
     _eventLoop = new EventLoop();
+  }
+  
+  public EventLoop getEventLoop() { 
+    return _eventLoop;
   }
   
   public void setMaxParallelStreams(int maxStreams) { 
@@ -134,39 +142,52 @@ public class S3Downloader implements NIOHttpConnection.Listener {
     
     Thread eventThread = (_ownsEventLoop) ? _eventLoop.getEventThread() : null;
     
+    final Semaphore shutdownSemaphore = new Semaphore(0);
     
     _eventLoop.setTimer(new Timer(1,false,new Timer.Callback() {
 
       // shutdown within the context of the async thread ... 
       public void timerFired(Timer timer) {
-        
-        // fail any active connections 
-        for (NIOHttpConnection connection : _activeConnections) { 
-          S3DownloadItem item = (S3DownloadItem) connection.getContext();
-          if (item != null) { 
-            failDownload(item, NIOHttpConnection.ErrorType.UNKNOWN,connection, false);
+      
+        try { 
+          
+          // fail any active connections 
+          for (NIOHttpConnection connection : Lists.newArrayList(_activeConnections)) { 
+            S3DownloadItem item = (S3DownloadItem) connection.getContext();
+            if (item != null) { 
+              failDownload(item, NIOHttpConnection.ErrorType.UNKNOWN,connection, false);
+            }
           }
+          
+          _activeConnections.clear();
+          
+          // next, fail all queued items 
+          for (S3DownloadItem item : _queuedItems) { 
+            failDownload(item, NIOHttpConnection.ErrorType.UNKNOWN,null, false);
+          }
+          _queuedItems.clear();
+          _freezeDownloads = false;
+          _callback = null;
+          
+          if (_ownsEventLoop) { 
+            //System.out.println("Stopping Event Loop");
+            _eventLoop.stop();
+          }
+          _eventLoop = null;
+          _ownsEventLoop = false;
         }
-        
-        
-        _activeConnections.clear();
-        
-        // next, fail all queued items 
-        for (S3DownloadItem item : _queuedItems) { 
-          failDownload(item, NIOHttpConnection.ErrorType.UNKNOWN,null, false);
+        finally { 
+          //System.out.println("Releasing Semaphore");
+          shutdownSemaphore.release();
         }
-        _queuedItems.clear();
-        _freezeDownloads = false;
-        _callback = null;
-        if (_ownsEventLoop) { 
-          _eventLoop.stop();
-        }
-        _eventLoop = null;
-        _ownsEventLoop = false;
       }  
     }));
-      
+    //System.out.println("Acquiring Shutdown Semaphore");
+    shutdownSemaphore.acquireUninterruptibly();
+    //System.out.println("Acquired Shutdown Semaphore");
+    
     try {
+      
       if (eventThread != null) { 
         eventThread.join();
       }
@@ -297,6 +318,8 @@ public class S3Downloader implements NIOHttpConnection.Listener {
       headers.set ("Connection", "close");
       headers.set("Cache-Control", "no-cache");
       headers.set("Pragma", "no-cache");
+      headers.remove("Accept-Encoding");
+      headers.set("Accept-Encoding","identity");
       
       // set up the listener relationship 
       connection.setListener(this);
@@ -497,7 +520,7 @@ public class S3Downloader implements NIOHttpConnection.Listener {
       boolean continueDownload = true;
       // callback to listener 
       if (_callback != null) { 
-        continueDownload = _callback.contentAvailable(item.getId(),item.getKey(), contentBuffer);
+        continueDownload = _callback.contentAvailable(theConnection,item.getId(),item.getKey(), contentBuffer);
       }
       
       if (!continueDownload) { 

@@ -33,7 +33,7 @@ import org.apache.commons.logging.LogFactory;
  * @author rana
  *
  */
-public class NIOClientTCPSocket implements NIOClientSocket {
+public class NIOClientTCPSocket extends NIOClientSocket {
 	
   public static final Log LOG = LogFactory.getLog(NIOClientTCPSocket.class);
   
@@ -67,43 +67,12 @@ public class NIOClientTCPSocket implements NIOClientSocket {
   }
 
   private static void setClientSocketOptions(SocketChannel channel) throws IOException{ 
-    channel.socket().setPerformancePreferences(0, 1, 3);
+    //channel.socket().setPerformancePreferences(0, 1, 3);
     channel.socket().setTcpNoDelay(true);
-    probeAndSetSize(false,2<<16,2<<10,channel);
-    probeAndSetSize(true,2<<15,2<<10,channel);
+    //probeAndSetSize(false,2<<18,2<<10,channel);
+    //probeAndSetSize(true,2<<15,2<<10,channel);
     channel.configureBlocking(false);
   }
-  
-  private static void probeAndSetSize(boolean sendSize,int targetSize,int minSize,SocketChannel channel)throws IOException { 
-    
-    if (sendSize && channel.socket().getSendBufferSize() >= targetSize) {  
-      //System.out.println("SendSize is Already:" + channel.socket().getSendBufferSize());
-      return;
-    }
-    else if (!sendSize && channel.socket().getReceiveBufferSize() >= targetSize) { 
-      //System.out.println("RcvSize is Already:" + channel.socket().getReceiveBufferSize());
-      return;
-    }
-    
-    do { 
-      
-      int sizeOut = 0;
-      if (sendSize) { 
-        channel.socket().setSendBufferSize(targetSize);
-        sizeOut = channel.socket().getSendBufferSize();
-      }
-      else { 
-        channel.socket().setReceiveBufferSize(targetSize);
-        sizeOut = channel.socket().getReceiveBufferSize();
-      }
-      if (sizeOut == targetSize)
-        break;
-      targetSize >>= 1;
-    }
-    while (targetSize > minSize);
-    
-  }
-  
   
   /** internal constructor used to create NIOSocket objects for incoming client connections **/ 
   NIOClientTCPSocket(SocketChannel channel) throws IOException {

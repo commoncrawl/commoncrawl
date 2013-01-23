@@ -21,19 +21,36 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 
-public interface NIOClientSocket extends NIOSocket {
+public abstract class NIOClientSocket implements NIOSocket {
 
+    boolean _readsDisabled;
+    
 	  /** connect to the given address and port  */
-	  void  connect(InetSocketAddress address) throws IOException;
+	  public abstract void  connect(InetSocketAddress address) throws IOException;
 	  /** used to finalize the establishment of the connection once the underlying Socket has become connectable*/
-	  boolean finishConnect()throws IOException;
+	  public abstract boolean finishConnect()throws IOException;
 	  
-	  InetSocketAddress getLocalSocketAddress() throws IOException;
-	  InetSocketAddress getSocketAddress()throws IOException;
+	  public abstract InetSocketAddress getLocalSocketAddress() throws IOException;
+	  public abstract InetSocketAddress getSocketAddress()throws IOException;
 	  
 	  /** read some data from the socket */
-	  int   read(ByteBuffer dst)throws IOException;
+	  public abstract int   read(ByteBuffer dst)throws IOException;
 	  /** write some data to the socket */
-	  int   write(ByteBuffer dst) throws IOException ;
+	  public abstract int   write(ByteBuffer dst) throws IOException ;
+	  
+	  /** return true if reads have been disabled **/
+	  synchronized public boolean readsDisabled() { 
+	    return _readsDisabled;
+	  }
+	  
+	  synchronized public void disableReads() { 
+	    _readsDisabled = true;
+	  }
+	  
+	   synchronized public void enableReads() { 
+	     _readsDisabled = false;
+	      
+	   }
+
 	  
 }

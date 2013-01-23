@@ -1,10 +1,12 @@
-package org.commoncrawl.hadoop.io;
+package org.commoncrawl.util.shared;
 
 /**
- * Copyright 2008 - CommonCrawl Foundation
- * 
- * CommonCrawl licenses this file to you under the Apache License, 
- * Version 2.0 (the "License"); you may not use this file except in compliance
+* Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
@@ -14,11 +16,11 @@ package org.commoncrawl.hadoop.io;
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */
+ * 
+ **/
 
 import java.io.BufferedReader;
 import java.io.EOFException;
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -39,7 +41,6 @@ import java.util.zip.CheckedInputStream;
 import java.util.zip.Inflater;
 import java.util.zip.InflaterInputStream;
 
-
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.GnuParser;
@@ -50,7 +51,6 @@ import org.apache.commons.cli.ParseException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.BytesWritable;
@@ -58,8 +58,6 @@ import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.hadoop.io.Text;
 import org.commoncrawl.crawl.common.shared.Constants;
 import org.commoncrawl.io.shared.NIOHttpHeaders;
-import org.commoncrawl.util.shared.ByteArrayUtils;
-import org.commoncrawl.util.shared.CCStringUtils;
 
 /**
  * Reads an ARC File via an InputStream, and returns the decompressed content as ArcFileItems
@@ -87,23 +85,53 @@ public final class ARCFileReader extends InflaterInputStream {
 
   /** allocation block size **/
   private static int                      _blockSize                = DEFAULT_BLOCK_SIZE;
-  /** stream pos variable **/
-  private int                             _streamPos                = 0;
+  
 
-  // ////////////////////////////////////////////////////////////////////////////////
+  //////////////////////////////////////////////////////////////////////////////////
   // public API
   // ////////////////////////////////////////////////////////////////////////////////
-
-  /**
-   * Costructs a new ArcFileReader object with specified block size (for
-   * allocations)
+  
+  /** 
+   * use this flag to use S3InputStream instead of the S3NFileSystem provided InputStream 
+   * to download S3 content. The (non-emr) version of the S3N unfortunately uses an outdated
+   * version of the jets3t libraries and performs very poorly with regards to Network IO. 
+   *   
    */
-  public ARCFileReader(InputStream inputStream)throws IOException {
-    super(new PushbackInputStream(inputStream,_blockSize), new Inflater(true), _blockSize);
+  public static final String USE_S3_INPUTSTREAM = "fs.s3n.use.s3inputstream";
+  
+  /** 
+   * Create a new ARCFileReader using the given input stream and optional context information
+   * @param source the source input stream 
+   * @param conf optional configuration object 
+   * @param uri optional uri
+   * @return
+   * @throws IOException
+   */
+  public static ARCFileReader newReader(InputStream source,final Configuration conf,final URI uri)throws IOException { 
+    if (uri != null && conf != null && uri.getScheme() != null && uri.getScheme().equalsIgnoreCase("s3n") && conf.getBoolean(USE_S3_INPUTSTREAM, false)) {
+      System.out.println("!!!!!!USING S3INPUTSTREAM");
+      // swap out sources
+      InputStream originalSource = source;
+      source = new S3InputStream(uri, conf.get("fs.s3n.awsAccessKeyId"), conf.get("fs.s3n.awsSecretAccessKey"), 1048576);
+      originalSource.close();
+    }
+    return new ARCFileReader(source);
+  }
+  
+  
+
+  /** 
+   * constructor is now private. use the factory method above to construct a reader 
+   * @param source
+   * @throws IOException
+   */
+  private ARCFileReader(final InputStream source)throws IOException {
+    super(new CustomPushbackInputStream(new CountingInputStream(source),
+        _blockSize), new Inflater(true), _blockSize);
     readARCHeader();
   }
 
-
+  
   /**
    * Checks to see if additional ArcFileItems can be extracted from the current
    * ARC File Stream This is a BLOCKING CALL - it will block on
@@ -114,7 +142,13 @@ public final class ARCFileReader extends InflaterInputStream {
    *           if an error occurs processing ARC file data
    */
   public boolean hasMoreItems() throws IOException {
-    return readHeader();
+    try { 
+      readHeader();
+      return true;
+    }
+    catch (EOFException e) { 
+      return false;
+    }
   }
 
   /**
@@ -123,7 +157,7 @@ public final class ARCFileReader extends InflaterInputStream {
    * @return Fully constructed ArcFileItem
    * @throws IOException
    */
-  public void getNextItem(Text key,BytesWritable value) throws IOException {
+  public void nextKeyValue(Text key,BytesWritable value) throws IOException {
 
     // read content
     _crc.reset();
@@ -131,7 +165,7 @@ public final class ARCFileReader extends InflaterInputStream {
     resetInflater();
 
     // save the arc file stream positon up front
-    long streamPos = getARCFileStreamPos();
+    long streamPos = getPosition();
 
     ArcFileBuilder builder = new ArcFileBuilder(streamPos,key,value);
 
@@ -173,34 +207,31 @@ public final class ARCFileReader extends InflaterInputStream {
 
   private void readARCHeader() throws IOException {
 
-    if (readHeader()) { 
-      byte accumBuffer[] = new byte[4096];
-  
-      int accumAmount = 0;
-      int readAmt = 0;
-  
-      while ((readAmt = this.read(accumBuffer, accumAmount, accumBuffer.length
-          - accumAmount)) > 0) {
-        accumAmount += readAmt;
-        if (accumAmount == accumBuffer.length) {
-          throw new IOException("Invalid ARC File Header");
-        }
-      }
-  
-      if (readAmt == 0 || accumAmount == 0) {
+    readHeader();
+    
+    byte accumBuffer[] = new byte[4096];
+
+    int accumAmount = 0;
+    int readAmt = 0;
+
+    while ((readAmt = this.read(accumBuffer, accumAmount, accumBuffer.length
+        - accumAmount)) > 0) {
+      accumAmount += readAmt;
+      if (accumAmount == accumBuffer.length) {
         throw new IOException("Invalid ARC File Header");
-      } else {
-        // calculate header crc ...
-        _crc.reset();
-        _crc.update(accumBuffer, 0, accumAmount);
-        // validate crc and header length ...
-        readTrailer();
-        // and decode header string ...
-        _arcFileHeader = new String(accumBuffer, 0, accumAmount, "ISO-8859-1");
       }
     }
-    else { 
-      throw new IOException("Unable to Read ARCFile Header!");
+
+    if (readAmt == 0 || accumAmount == 0) {
+      throw new IOException("Invalid ARC File Header");
+    } else {
+      // calculate header crc ...
+      _crc.reset();
+      _crc.update(accumBuffer, 0, accumAmount);
+      // validate crc and header length ...
+      readTrailer();
+      // and decode header string ...
+      _arcFileHeader = new String(accumBuffer, 0, accumAmount, "ISO-8859-1");
     }
   }
 
@@ -222,51 +253,45 @@ public final class ARCFileReader extends InflaterInputStream {
   /*
    * Reads GZIP member header.
    */
-  private boolean readHeader() throws IOException {
+  private void readHeader() throws IOException {
 
     CheckedInputStream in = new CheckedInputStream(this.in, _crc);
 
     _crc.reset();
 
-    try {
-      // Check header magic
-      if (readUShort(in) != GZIP_MAGIC) {
-        throw new IOException("Not in GZIP format");
-      }
-      // Check compression method
-      if (readUByte(in) != 8) {
-        throw new IOException("Unsupported compression method");
-      }
-      // Read flags
-      int flg = readUByte(in);
-      // Skip MTIME, XFL, and OS fields
-      skipBytes(in, 6);
-      // Skip optional extra field
-      if ((flg & FEXTRA) == FEXTRA) {
-        skipBytes(in, readUShort(in));
-      }
-      // Skip optional file name
-      if ((flg & FNAME) == FNAME) {
-        while (readUByte(in) != 0)
-          ;
-      }
-      // Skip optional file comment
-      if ((flg & FCOMMENT) == FCOMMENT) {
-        while (readUByte(in) != 0)
-          ;
-      }
-      // Check optional header CRC
-      if ((flg & FHCRC) == FHCRC) {
-        int v = (int) _crc.getValue() & 0xffff;
-        if (readUShort(in) != v) {
-          throw new IOException("Corrupt GZIP header");
-        }
-      }
-      return true;
-    } catch (EOFException e) {
-      LOG.error(CCStringUtils.stringifyException(e));
+    // Check header magic
+    if (readUShort(in) != GZIP_MAGIC) {
+      throw new IOException("Not in GZIP format");
     }
-    return false; 
+    // Check compression method
+    if (readUByte(in) != 8) {
+      throw new IOException("Unsupported compression method");
+    }
+    // Read flags
+    int flg = readUByte(in);
+    // Skip MTIME, XFL, and OS fields
+    skipBytes(in, 6);
+    // Skip optional extra field
+    if ((flg & FEXTRA) == FEXTRA) {
+      skipBytes(in, readUShort(in));
+    }
+    // Skip optional file name
+    if ((flg & FNAME) == FNAME) {
+      while (readUByte(in) != 0)
+        ;
+    }
+    // Skip optional file comment
+    if ((flg & FCOMMENT) == FCOMMENT) {
+      while (readUByte(in) != 0)
+        ;
+    }
+    // Check optional header CRC
+    if ((flg & FHCRC) == FHCRC) {
+      int v = (int) _crc.getValue() & 0xffff;
+      if (readUShort(in) != v) {
+        throw new IOException("Corrupt GZIP header");
+      }
+    }
   }
 
   /*
@@ -343,9 +368,9 @@ public final class ARCFileReader extends InflaterInputStream {
    * @throws IOException
    *           if error occurs
    */
-  private final int getARCFileStreamPos() throws IOException {
-    PushbackInputStream in = (PushbackInputStream) this.in;
-    return _streamPos - in.available();
+  public final long getPosition() throws IOException {
+    CustomPushbackInputStream in = (CustomPushbackInputStream) this.in;
+    return ((CountingInputStream)in.getSource()).getPosition() - in.available();
   }
 
   /**
@@ -752,6 +777,24 @@ public final class ARCFileReader extends InflaterInputStream {
     }
   }
 
+  /** 
+   * sigh... stupid java classes and their overdone encapsulation :-(
+   *  
+   * @author rana
+   *
+   */
+  static class CustomPushbackInputStream extends PushbackInputStream {
+
+    public CustomPushbackInputStream(InputStream in, int size) {
+      super(in, size);
+    }
+    
+    public InputStream getSource() { 
+      return in;
+    }
+    
+  }
+  
   static Options options = new Options();
   static { 
     
@@ -760,7 +803,14 @@ public final class ARCFileReader extends InflaterInputStream {
     
     options.addOption(
         OptionBuilder.withArgName("file").hasArg().withDescription("ARC File Path").isRequired().create("file"));
+    
+    options.addOption(
+        OptionBuilder.withArgName("awsAccessKey").hasArg().withDescription("AWS Access Key").create("awsAccessKey"));
 
+    options.addOption(
+        OptionBuilder.withArgName("awsSecret").hasArg().withDescription("AWS Secret").create("awsSecret"));
+
+    
   }
   
   static void printUsage() { 
@@ -768,7 +818,7 @@ public final class ARCFileReader extends InflaterInputStream {
     formatter.printHelp( "ARCFileReaer", options );
   }
   
-  public static void main(String[] args)throws IOException, URISyntaxException {
+  public static void main(String[] args)throws IOException, URISyntaxException, InterruptedException {
     
     Configuration conf = new Configuration();
 
@@ -787,35 +837,64 @@ public final class ARCFileReader extends InflaterInputStream {
       if (cmdLine.hasOption("conf")) { 
         conf.addResource(new Path(cmdLine.getOptionValue("conf")));
       }
+      if (cmdLine.hasOption("awsAccessKey")) { 
+        conf.set("fs.s3n.awsAccessKeyId", cmdLine.getOptionValue("awsAccessKey"));
+      }
+      if (cmdLine.hasOption("awsSecret")) { 
+        conf.set("fs.s3n.awsSecretAccessKey", cmdLine.getOptionValue("awsSecret"));
+      }
     }
     catch (ParseException e) { 
       System.out.println(e.toString());
       printUsage();
       System.exit(1);
     }
-    
-    URI uri =  new URI(path);
+
+
+    final URI uri =  new URI(path);
     FileSystem fs = FileSystem.get(uri,conf);
-    FSDataInputStream stream = fs.open(new Path(uri));
+        
+    //use s3inputstream to download content 
+    conf.setBoolean(ARCFileReader.USE_S3_INPUTSTREAM, true);
+    
+//    byte data[] = new byte[4096*10];
+//    int readAmt = 0;
+//    while ((readAmt = stream.get().read(data)) != -1) { 
+//      System.out.println(HexDump.dumpHexString(data, 0, readAmt));
+//    }
+//    stream.get().close();
+//    System.exit(1);
+    
+    ARCFileReader reader = null;
     
     try { 
-      ARCFileReader reader = new ARCFileReader(stream);
+      System.out.println("Initializing Reader for Path:" + uri );
+      reader = ARCFileReader.newReader(fs.open(new Path(path)),conf,uri);
       
       Text key = new Text();
       BytesWritable value = new BytesWritable();
       
       while (reader.hasMoreItems()) {
-        reader.getNextItem(key, value);
+        reader.nextKeyValue(key, value);
         int indexOfTrailingCRLF = ByteArrayUtils.indexOf(value.getBytes(), 0, value.getLength(), "\r\n\r\n".getBytes());
         int headerLen = indexOfTrailingCRLF + 4;
         int contentLen = value.getLength() - headerLen;
         
         String outputStr = "Key:" + key.toString() + " HeaderLen:" + headerLen + " ContentLen:" + contentLen;
         System.out.println(outputStr);
+        
+        //String contentStr = new String(value.getBytes(),headerLen,contentLen,Charset.forName("ASCII"));
+        //System.out.println(contentStr.substring(contentStr.length() - 20));
       }
+      System.out.println("Exiting Loop");
+    }
+    catch (Exception e) {
+      LOG.error(CCStringUtils.stringifyException(e));
+      //throw new IOException(e);
     }
     finally { 
-      stream.close();
+      System.out.println("***Closing Reader");
+      reader.close();
     }
   }
 

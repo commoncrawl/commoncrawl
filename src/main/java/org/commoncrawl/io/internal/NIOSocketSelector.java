@@ -128,6 +128,10 @@ public class NIOSocketSelector {
     registerSocket(theSocket,SelectionKey.OP_ACCEPT);
   }
   
+  public void enableReads(NIOClientSocket theSocket)throws IOException { 
+    
+  }
+  
   
   /** cancel all event registrations on the specified object (socket) */ 
   public void cancelRegistration(NIOSocket theSocket) { 
@@ -150,32 +154,41 @@ public class NIOSocketSelector {
   }
     
   /** internal registration helper */
-  private void registerSocket(NIOSocket theSocket, int interestOps)throws IOException { 
+  public void registerSocket(NIOSocket theSocket, int interestOps)throws IOException { 
     
-	if (_eventLoop == null || _eventLoop.getEventThread() == Thread.currentThread()) { 
-		
-	    SelectionKey key = theSocket.getChannel().keyFor(_selector);
-	    
-	    if (key == null) {
-	      key = theSocket.getChannel().register(_selector,interestOps,theSocket);
-	    }
-	    else { 
-	      key.interestOps(key.interestOps() | interestOps);
-	    }
-	}
-	else { 
-		synchronized(_pendingRegistrations) {
-			
-			PendingRegistration pendingRegistration = _pendingRegistrations.get(theSocket.getSocketId());
-			if (pendingRegistration == null) { 
-				_pendingRegistrations.put(theSocket.getSocketId(),new PendingRegistration(theSocket,interestOps));
-			}
-			else { 
-				pendingRegistration.setInterestOps(pendingRegistration.getInterestOps() | interestOps);
-			}
-		}
-		_eventLoop.wakeup();
-	}
+  	if (_eventLoop == null || _eventLoop.getEventThread() == Thread.currentThread()) { 
+
+  	    
+  	    SelectionKey key = theSocket.getChannel().keyFor(_selector);
+  	    
+      if (key == null) {
+         if (theSocket.readsDisabled()) { 
+           interestOps = (interestOps & ~SelectionKey.OP_READ);
+         }
+         if (interestOps != 0) { 
+           key = theSocket.getChannel().register(_selector,interestOps,theSocket);
+         }
+      }
+      else {
+        key.interestOps(key.interestOps() | interestOps);
+        if (theSocket.readsDisabled()) { 
+          key.interestOps(key.interestOps() & ~SelectionKey.OP_READ);
+        }
+      }
+  	}
+  	else { 
+  		synchronized(_pendingRegistrations) {
+  			
+  			PendingRegistration pendingRegistration = _pendingRegistrations.get(theSocket.getSocketId());
+  			if (pendingRegistration == null) { 
+  				_pendingRegistrations.put(theSocket.getSocketId(),new PendingRegistration(theSocket,interestOps));
+  			}
+  			else { 
+  				pendingRegistration.setInterestOps(pendingRegistration.getInterestOps() | interestOps);
+  			}
+  		}
+  		_eventLoop.wakeup();
+  	}
   }
   
   private final void processPendingRegistrations() { 
@@ -310,7 +323,7 @@ public class NIOSocketSelector {
           	
           	// reset interest ops 
               selectionKey.interestOps(0);
-          	
+              
               // process events in key ... 
               if (selectionKey.isConnectable()) {
               	
@@ -366,11 +379,12 @@ public class NIOSocketSelector {
               	int bytesRead = -1;
               	
               	try {
-              	  
+              	  //long nanoTimeStart = System.nanoTime();
               	  timeStart = System.currentTimeMillis();
               	  // track the number of actual bytes read in the callback ... 
               	  bytesRead = ((NIOClientSocketListener)theSocket.getListener()).Readable((NIOClientSocket)theSocket);
-              	  //System.out.println("Readable Took:" + (System.currentTimeMillis() - timeStart));
+              	  //long nanoTimeEnd = System.nanoTime();
+              	  //System.out.println("Readable Took:" + (nanoTimeEnd - nanoTimeStart) + " BytesRead:" + bytesRead);
                   if (timeUsageDetailOut != null) { 
                     timeUsageDetailOut.timeInReadableEvt += System.currentTimeMillis() - timeStart;
                   }

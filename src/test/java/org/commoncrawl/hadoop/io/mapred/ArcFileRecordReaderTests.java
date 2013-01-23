@@ -1,4 +1,24 @@
-package org.commoncrawl.hadoop.io;
+package org.commoncrawl.hadoop.io.mapred;
+
+/**
+* Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ * 
+ **/
+
 
 import java.io.File;
 import java.io.IOException;
@@ -7,7 +27,6 @@ import java.util.List;
 
 import junit.framework.Assert;
 
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.LocalFileSystem;
@@ -15,21 +34,27 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.MD5Hash;
 import org.apache.hadoop.io.Text;
-import org.apache.hadoop.mapreduce.TaskAttemptContext;
-import org.apache.hadoop.mapreduce.TaskAttemptID;
-import org.apache.hadoop.mapreduce.lib.input.FileSplit;
-import org.commoncrawl.hadoop.io.ARCFileRecordReader;
-import org.commoncrawl.hadoop.io.ArcFileReaderTests.TestRecord;
+import org.apache.hadoop.mapred.FileSplit;
+import org.apache.hadoop.mapred.JobConf;
+import org.commoncrawl.hadoop.io.mapred.ARCFileRecordReader;
 import org.commoncrawl.io.shared.NIOHttpHeaders;
+import org.commoncrawl.util.shared.ArcFileReaderTests;
 import org.commoncrawl.util.shared.ByteArrayUtils;
+import org.commoncrawl.util.shared.ArcFileReaderTests.TestRecord;
 import org.junit.Test;
 
+/** 
+ * ARCFileRecordReader tests
+ * 
+ * @author rana
+ *
+ */
 public class ArcFileRecordReaderTests {
   
   @Test
   public void TestARCFileRecordReader() throws IOException, InterruptedException { 
     
-    Configuration conf = new Configuration();
+    JobConf conf = new JobConf();
     FileSystem fs = LocalFileSystem.newInstance(conf);
     Path path = new Path("/tmp/" + File.createTempFile("ARCRecordReader", "test"));
     List<TestRecord> records = ArcFileReaderTests.buildTestRecords(ArcFileReaderTests.BASIC_TEST_RECORD_COUNT);
@@ -52,14 +77,15 @@ public class ArcFileRecordReaderTests {
     
     FileSplit split = new FileSplit(path, 0, fs.getFileStatus(path).getLen(), new String[0]);
     ARCFileRecordReader reader = new ARCFileRecordReader();
-    reader.initialize(split, new TaskAttemptContext(conf, new TaskAttemptID()));
+    reader.initialize(conf,split);
     
     int index = 0;
     
     // iterate and validate stuff ... 
-    while (reader.nextKeyValue()) {
-      Text key = reader.getCurrentKey();
-      BytesWritable value = reader.getCurrentValue();
+    Text key = reader.createKey();
+    BytesWritable value = reader.createValue();
+
+    while (reader.next(key,value)) {
       
       TestRecord testRecord = records.get(index++);
       // get test key bytes as utf-8 bytes ... 

@@ -1,4 +1,24 @@
-package org.commoncrawl.hadoop.io;
+package org.commoncrawl.hadoop.io.mapred;
+
+/**
+* Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ * 
+ **/
+
 
 import java.io.File;
 import java.io.IOException;
@@ -14,22 +34,26 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.MD5Hash;
 import org.apache.hadoop.io.Text;
-import org.apache.hadoop.mapreduce.InputSplit;
-import org.apache.hadoop.mapreduce.Job;
-import org.apache.hadoop.mapreduce.RecordReader;
-import org.apache.hadoop.mapreduce.TaskAttemptContext;
-import org.apache.hadoop.mapreduce.TaskAttemptID;
-import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
-import org.apache.hadoop.mapreduce.lib.input.FileSplit;
-import org.commoncrawl.hadoop.io.ARCFileInputFormat;
-import org.commoncrawl.hadoop.io.ArcFileReaderTests.TestRecord;
+import org.apache.hadoop.mapred.FileInputFormat;
+import org.apache.hadoop.mapred.FileSplit;
+import org.apache.hadoop.mapred.InputSplit;
+import org.apache.hadoop.mapred.JobConf;
+import org.apache.hadoop.mapred.RecordReader;
 import org.commoncrawl.io.shared.NIOHttpHeaders;
+import org.commoncrawl.util.shared.ArcFileReaderTests;
 import org.commoncrawl.util.shared.ByteArrayUtils;
+import org.commoncrawl.util.shared.ArcFileReaderTests.TestRecord;
 import org.commoncrawl.util.shared.Tuples.Pair;
 import org.junit.Test;
 
 import com.google.common.collect.Lists;
 
+/** 
+ * ARCFileInputFormat test
+ * 
+ * @author rana
+ *
+ */
 public class ArcFileInputFormatTests {
 
   static Pair<Path,List<TestRecord>> buildTestARCFile(Path directoryPath,FileSystem fs, int fileId)throws IOException { 
@@ -82,10 +106,10 @@ public class ArcFileInputFormatTests {
     List<TestRecord> records = splits.get(splitDataIndex).e1;
     
     int itemIndex = 0;
-    // iterate and validate stuff ... 
-    while (reader.nextKeyValue()) {
-      Text key = reader.getCurrentKey();
-      BytesWritable value = reader.getCurrentValue();
+    // iterate and validate stuff ...
+    Text key = new Text();
+    BytesWritable value = new BytesWritable();
+    while (reader.next(key, value)) {
       
       TestRecord testRecord = records.get(itemIndex++);
       // get test key bytes as utf-8 bytes ... 
@@ -110,8 +134,8 @@ public class ArcFileInputFormatTests {
   @Test
   public void TestArcInputFormat() throws IOException, InterruptedException {
     for (int i=0;i<10;++i) { 
-      Job job = new Job();
-      FileSystem fs = LocalFileSystem.newInstance(job.getConfiguration());
+      JobConf job = new JobConf();
+      FileSystem fs = LocalFileSystem.newInstance(job);
       Path path = new Path("/tmp/" + File.createTempFile("ARCInputFormat", "test").getName());
       fs.mkdirs(path);
       
@@ -121,10 +145,10 @@ public class ArcFileInputFormatTests {
       
       ARCFileInputFormat inputFormat = new ARCFileInputFormat();
       
-      List<InputSplit> splits = inputFormat.getSplits(job);
+      InputSplit splits[] = inputFormat.getSplits(job,0);
       
       for (InputSplit split : splits) { 
-        RecordReader<Text,BytesWritable> reader = inputFormat.createRecordReader(split, new TaskAttemptContext(job.getConfiguration(), new TaskAttemptID()));
+        RecordReader<Text,BytesWritable> reader = inputFormat.getRecordReader(split, job, null);
         validateSplit(fs,split,fileList,reader);
       }
       

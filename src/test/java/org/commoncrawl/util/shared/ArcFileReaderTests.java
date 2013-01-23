@@ -1,4 +1,23 @@
-package org.commoncrawl.hadoop.io;
+package org.commoncrawl.util.shared;
+
+/**
+* Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ * 
+ **/
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -21,7 +40,6 @@ import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.hadoop.io.MD5Hash;
 import org.apache.hadoop.io.Text;
 import org.commoncrawl.crawl.common.shared.Constants;
-import org.commoncrawl.hadoop.io.ARCFileReader;
 import org.commoncrawl.io.shared.NIOHttpHeaders;
 import org.commoncrawl.protocol.shared.ArcFileItem;
 import org.commoncrawl.util.shared.ByteArrayUtils;
@@ -34,6 +52,12 @@ import org.junit.Test;
 
 import com.google.common.collect.Lists;
 
+/** 
+ * ARCFileReader tests
+ * 
+ * @author rana
+ *
+ */
 public class ArcFileReaderTests {
 
   private static final Log              LOG                      = LogFactory
@@ -184,11 +208,11 @@ public class ArcFileReaderTests {
   }
   
   
-  static void writeFirstRecord(final OutputStream os,final String fileName,long ts) throws IOException {
+  public static void writeFirstRecord(final OutputStream os,final String fileName,long ts) throws IOException {
     os.write(generateARCFileMetaData(fileName,TIMESTAMP14.format(new Date(System.currentTimeMillis()))));
   }
 
-  static boolean write(OutputStream os,String normalizedURL,String arcFileName, int segmentid, int crawlNumber,byte[] crawlData,int crawlDataOffset,int crawlDataLen,NIOHttpHeaders headers, String contentType,
+  public static boolean write(OutputStream os,String normalizedURL,String arcFileName, int segmentid, int crawlNumber,byte[] crawlData,int crawlDataOffset,int crawlDataLen,NIOHttpHeaders headers, String contentType,
       String signature, int hostIP,long lastAttemptTime) throws IOException {
 
     String encodedURI = normalizedURL;
@@ -350,14 +374,14 @@ public class ArcFileReaderTests {
   
   static final String validHeaderChars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 
-  static class TestRecord { 
-    String url;
-    byte[] data;
-    List<Pair<String,String>> headers;
+  public static class TestRecord { 
+    public String url;
+    public byte[] data;
+    public List<Pair<String,String>> headers;
   }
   
   
-  static List<TestRecord> buildTestRecords(int recordCount) {
+  public static List<TestRecord> buildTestRecords(int recordCount) {
     Random random = new Random();
     
     List<TestRecord> records = Lists.newArrayList();
@@ -378,7 +402,7 @@ public class ArcFileReaderTests {
     return records;
   }
   
-  static final int BASIC_TEST_RECORD_COUNT = 100;
+  public static final int BASIC_TEST_RECORD_COUNT = 100;
   
   /** 
    * test basic reader functionality by creating a mock ARCFile in memory and then reading it back and validating the contents... 
@@ -413,14 +437,14 @@ public class ArcFileReaderTests {
         }
       };
       in.reset(os.getData(),os.getLength());
-      ARCFileReader reader = new ARCFileReader(in);
+      ARCFileReader reader = ARCFileReader.newReader(in,null,null);
       int index = 0;
       Text key = new Text();
       BytesWritable value = new BytesWritable();
       
       // iterate and validate stuff ... 
       while (reader.hasMoreItems()) {
-        reader.getNextItem(key, value);
+        reader.nextKeyValue(key, value);
         TestRecord testRecord = records.get(index++);
         // get test key bytes as utf-8 bytes ... 
         byte[] testKeyBytes = testRecord.url.getBytes(Charset.forName("UTF-8"));
@@ -466,7 +490,7 @@ public class ArcFileReaderTests {
    * @param length2
    * @return
    */
-  static int compareTo(byte[] buffer1, int offset1, int length1,
+  public static int compareTo(byte[] buffer1, int offset1, int length1,
       byte[] buffer2, int offset2, int length2) {
     // Short circuit equal case
     if (buffer1 == buffer2 &&

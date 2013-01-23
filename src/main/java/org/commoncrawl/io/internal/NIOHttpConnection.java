@@ -512,7 +512,7 @@ public final class NIOHttpConnection implements NIOClientSocketListener , NIODNS
   
   public final Exception getLastException() { return _lastException; }
   
-  public final NIOSocket getSocket() { return _socket; } 
+  public final NIOClientSocket getSocket() { return _socket; } 
 
   
   public void open() throws IOException { 
@@ -1603,5 +1603,18 @@ public final class NIOHttpConnection implements NIOClientSocketListener , NIODNS
     return true;
   }
   
+  public void disableReads() { 
+    if (_socket != null) { 
+      _socket.disableReads();
+    }
+  }
+  
+  public void enableReads()throws IOException { 
+    if (_socket != null && _socket.isOpen()) { 
+      _socket.enableReads();
+      _selector.registerForRead(_socket);
+    }
+  }
+
   
 }

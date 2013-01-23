@@ -36,6 +36,7 @@ public class EventLoop  implements Runnable  {
                                                            .getLog(EventLoop.class);
 
   ExecutorService                   _resolverThreadPool = null;
+  boolean                           _ownsResolverThreadPool = false;
   NIODNSLocalResolver               _resolver;
   NIOSocketSelector                 _selector;
   Thread                            _eventThread;
@@ -78,6 +79,7 @@ public class EventLoop  implements Runnable  {
     if (_resolver == null) { 
       if (_resolverThreadPool == null) { 
         _resolverThreadPool = Executors.newFixedThreadPool(1);
+        _ownsResolverThreadPool = true;
       }
       _resolver = new NIODNSLocalResolver(this, _resolverThreadPool, true);
     }
@@ -125,6 +127,11 @@ public class EventLoop  implements Runnable  {
       }
     }
 
+    if (_ownsResolverThreadPool) { 
+      _resolverThreadPool.shutdown();
+      _resolverThreadPool = null;
+    }
+    _resolver = null;
   }
 
   //@Override

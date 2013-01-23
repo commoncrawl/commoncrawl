@@ -54,4 +54,6 @@ public interface NIOSocket {
   /** closes (and disconnects) the socket */
   void  close();
   
+  boolean readsDisabled();
+  
 }

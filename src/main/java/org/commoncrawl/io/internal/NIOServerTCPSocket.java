@@ -129,4 +129,9 @@ public class NIOServerTCPSocket implements NIOServerSocket {
 	public void setListener(NIOSocketListener listener) {
 		_listener = (NIOServerSocketListener) listener;		
 	}
+
+  @Override
+  public boolean readsDisabled() {
+    return false;
+  }
 }

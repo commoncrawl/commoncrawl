@@ -23,47 +23,54 @@ import java.nio.ByteBuffer;
 
 public class NIOBufferListInputStream extends InputStream {
 
-	private NIOBufferList 	_source = null;
-	private ByteBuffer	_buffer = null;
+  protected NIOBufferList 	_bufferQueue = null;
+	protected ByteBuffer	    _activeBuf = null;
+	protected long            _streamPos = 0;
 	
 	public NIOBufferListInputStream(NIOBufferList source) { 
-		_source = source;
+		_bufferQueue = source;
 	}
 	
 	
-	public void reset() { 
-		_buffer = null;
+	public synchronized void reset() { 
+		_activeBuf = null;
 	}
 	
-	private void getNext() throws IOException { 
-		_buffer = null;
-		_buffer = _source.read();
+	
+	public long getStreamPos() { 
+	  return _streamPos;
 	}
 	
-	private void ensureBuffer() throws IOException { 
-		if (_buffer == null || _buffer.remaining() == 0) { 
+	protected synchronized  void getNext() throws IOException { 
+		_activeBuf = null;
+		_activeBuf = _bufferQueue.read();
+	}
+	
+	protected synchronized void ensureBuffer() throws IOException { 
+		if (_activeBuf == null || _activeBuf.remaining() == 0) { 
 			getNext();
 		}
 	}
 
-	//@Override
-	public int read() throws IOException {
+	@Override
+	public synchronized int read() throws IOException {
 	    ensureBuffer();
-		if (_buffer != null) { 
-			return (int) (_buffer.get() & 0xff);
+		if (_activeBuf != null) {
+		  _streamPos++;
+			return (int) (_activeBuf.get() & 0xff);
 		}
 		return -1;
 	}
 
-	//@Override
-	public int available() throws IOException {
+	@Override
+	public synchronized int available() throws IOException {
 		
 		int available = 0;
 		
-		if (_buffer != null) { 
-			available += _buffer.remaining();
+		if (_activeBuf != null) { 
+			available += _activeBuf.remaining();
 		}
-		available += _source.available();
+		available += _bufferQueue.available();
 		
 		return available;
 	}
@@ -78,7 +85,7 @@ public class NIOBufferListInputStream extends InputStream {
 	 * @return new NIOBufferListInputStream contstrained to desired stream size
 	 * @throws IOException
 	 */
-	public NIOBufferListInputStream subStream(int desiredStreamSize)throws IOException { 
+	public synchronized NIOBufferListInputStream subStream(int desiredStreamSize)throws IOException { 
 	  // throw EOF if we don't have enough bytes to service the request 
 	  if (available() < desiredStreamSize) { 
 	    throw new EOFException();
@@ -95,28 +102,28 @@ public class NIOBufferListInputStream extends InputStream {
           ensureBuffer();
           
           //if we could get another buffer from list. bail... 
-          if (_buffer == null) { 
+          if (_activeBuf == null) { 
               break;
           }
           
           // calculate bytes available
-          final int sizeAvailable = _buffer.remaining();
+          final int sizeAvailable = _activeBuf.remaining();
           // and bytes to read this iteration ... 
           final int sizeToRead    = Math.min(sizeAvailable,len);
           // if we can consume entire buffer ... 
           if (sizeAvailable <= sizeToRead) {
             // slice the existing buffer ... 
-            ByteBuffer buffer = _buffer.slice();
+            ByteBuffer buffer = _activeBuf.slice();
             // position it to limit (bufferList.write flips it, so we must do this).
             buffer.position(buffer.limit());
             // add to buffer list via write 
             bufferList.write(buffer);
             // null out this buffer as it has been fully consumed 
-            _buffer = null;
+            _activeBuf = null;
           }
           else {
             // slice the existing buffer 
-            ByteBuffer buffer = _buffer.slice();
+            ByteBuffer buffer = _activeBuf.slice();
             // reset limit on new buffer 
             buffer.limit(buffer.position() + sizeToRead);
             // position the new buffer to limit (to facilitate flip in write call)
@@ -124,7 +131,7 @@ public class NIOBufferListInputStream extends InputStream {
             // add it to buffer list 
             bufferList.write(buffer);
             // and increment position of source buffer 
-            _buffer.position(_buffer.position() + sizeToRead);
+            _activeBuf.position(_activeBuf.position() + sizeToRead);
           }
           
           len -= sizeToRead;
@@ -137,11 +144,13 @@ public class NIOBufferListInputStream extends InputStream {
         throw new EOFException();
       }
       
+      _streamPos += sizeOut;
+      
       return new NIOBufferListInputStream(bufferList);	  
 	}
 
-	//@Override
-	public int read(byte[] b, int off, int len) throws IOException {
+	@Override
+	public synchronized int read(byte[] b, int off, int len) throws IOException {
 		
 		int sizeOut = 0;
 		
@@ -149,28 +158,31 @@ public class NIOBufferListInputStream extends InputStream {
 			
 			ensureBuffer();
 			
-			if (_buffer == null) { 
+			if (_activeBuf == null) { 
 				break;
 			}
 			
-			final int sizeAvailable = _buffer.remaining();
+			final int sizeAvailable = _activeBuf.remaining();
 			final int sizeToRead    = Math.min(sizeAvailable,len);
 			
-			_buffer.get(b, off, sizeToRead);
+			_activeBuf.get(b, off, sizeToRead);
 			
 			len -= sizeToRead;
 			sizeOut += sizeToRead;
 			off += sizeToRead;
 		}
+		
+		_streamPos += sizeOut;
+		
 		return (sizeOut != 0) ? sizeOut : -1;
 	}
 
-	//@Override
-	public int read(byte[] b) throws IOException {
+	@Override
+	public synchronized int read(byte[] b) throws IOException {
 		return read(b,0,b.length);
 	}
 
-	//@Override
+	@Override
 	public long skip(long skipAmount) throws IOException {
 		
 		long skipAmountOut = 0;
@@ -179,27 +191,30 @@ public class NIOBufferListInputStream extends InputStream {
 			
 			ensureBuffer();
 			
-			if (_buffer == null) { 
+			if (_activeBuf == null) { 
 				break;
 			}
 			
-			final long sizeAvailable = _buffer.remaining();
+			final long sizeAvailable = _activeBuf.remaining();
 			final int  sizeToSkip    = (int) Math.min(sizeAvailable,skipAmount);
 			
-			_buffer.position(_buffer.position() + sizeToSkip);
+			_activeBuf.position(_activeBuf.position() + sizeToSkip);
 			
 			skipAmount -= sizeToSkip;
 			skipAmountOut += sizeToSkip;
 		}
-		return skipAmount;
+		
+		_streamPos += skipAmountOut;
+		
+		return skipAmountOut;
 	}
 	
 	@Override
-	public void close() throws IOException {
+	public synchronized void close() throws IOException {
 	  
-	  if (_buffer != null && _buffer.remaining() != 0) { 
-	    if (_source != null) { 
-	      _source.putBack(_buffer);
+	  if (_activeBuf != null && _activeBuf.remaining() != 0) { 
+	    if (_bufferQueue != null) { 
+	      _bufferQueue.putBack(_activeBuf);
 	    }
 	  }
 	  
