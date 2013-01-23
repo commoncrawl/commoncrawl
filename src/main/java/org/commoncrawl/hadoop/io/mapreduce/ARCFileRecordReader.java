@@ -21,6 +21,7 @@ package org.commoncrawl.hadoop.io.mapreduce;
 
 
 import java.io.IOException;
+import java.io.InputStream;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -36,6 +37,8 @@ import org.apache.hadoop.mapreduce.RecordReader;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.lib.input.FileSplit;
 import org.commoncrawl.util.shared.ARCFileReader;
+import org.commoncrawl.util.shared.CCStringUtils;
+import org.commoncrawl.util.shared.S3InputStream;
 import org.jets3t.service.Jets3tProperties;
 
 /** 
@@ -46,6 +49,7 @@ import org.jets3t.service.Jets3tProperties;
  */
 public class ARCFileRecordReader extends RecordReader<Text, BytesWritable>{
 
+  
   /** logging **/
   private static final Log LOG = LogFactory.getLog(ARCFileRecordReader.class);
 
@@ -63,12 +67,27 @@ public class ARCFileRecordReader extends RecordReader<Text, BytesWritable>{
     conf = context.getConfiguration();    
     Path path = fileSplit.getPath();
     FileSystem fs = path.getFileSystem(conf);
-    if (fs instanceof NativeS3FileSystem) { 
-      Jets3tProperties properties = Jets3tProperties.getInstance(org.jets3t.service.Constants.JETS3T_PROPERTIES_FILENAME);
-      properties.setProperty("s3service.https-only","false");
+    InputStream in = null;
+    if (fs instanceof NativeS3FileSystem) {
+      if (conf.getBoolean(ARCFileInputFormat.USE_S3_INPUTSTREAM, false)) {
+        in = new S3InputStream(path.toUri(), conf.get("fs.s3n.awsAccessKeyId"), conf.get("fs.s3n.awsSecretAccessKey"), 1048576);
+      }
+      else { 
+        Jets3tProperties properties = Jets3tProperties.getInstance(org.jets3t.service.Constants.JETS3T_PROPERTIES_FILENAME);
+        properties.setProperty("s3service.https-only","false");
+      }
     }
-    FSDataInputStream in = fs.open(path);
-    reader = ARCFileReader.newReader(in,conf, path.toUri());
+    if (in == null) { 
+      in = fs.open(path);
+    }
+    try { 
+      reader = new ARCFileReader(in);
+    }
+    catch (IOException e) { 
+      LOG.error(CCStringUtils.stringifyException(e));
+      in.close();
+      throw e;
+    }
     start = fileSplit.getStart();
     end   = fileSplit.getLength();
     if (start != 0 || fs.getFileStatus(path).getLen() != end) { 

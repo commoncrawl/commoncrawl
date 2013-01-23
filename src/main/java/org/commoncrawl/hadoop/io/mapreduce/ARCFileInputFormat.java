@@ -44,6 +44,15 @@ import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 public class ARCFileInputFormat extends FileInputFormat<Text, BytesWritable> {
 
   private static final String ARC_SUFFIX = "arc.gz";
+  
+  /** 
+   * use this flag to use S3InputStream instead of the S3NFileSystem provided InputStream 
+   * to download S3 content. The (non-emr) version of the S3N unfortunately uses an outdated
+   * version of the jets3t libraries and performs very poorly with regards to Network IO. 
+   *   
+   */
+  public static final String USE_S3_INPUTSTREAM = "fs.s3n.use.s3inputstream";
+  
     
 	@Override
 	public RecordReader<Text, BytesWritable> createRecordReader(InputSplit split,TaskAttemptContext context) throws IOException,InterruptedException {

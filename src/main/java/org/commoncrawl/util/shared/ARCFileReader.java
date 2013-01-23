@@ -91,41 +91,13 @@ public final class ARCFileReader extends InflaterInputStream {
   // public API
   // ////////////////////////////////////////////////////////////////////////////////
   
-  /** 
-   * use this flag to use S3InputStream instead of the S3NFileSystem provided InputStream 
-   * to download S3 content. The (non-emr) version of the S3N unfortunately uses an outdated
-   * version of the jets3t libraries and performs very poorly with regards to Network IO. 
-   *   
-   */
-  public static final String USE_S3_INPUTSTREAM = "fs.s3n.use.s3inputstream";
   
-  /** 
-   * Create a new ARCFileReader using the given input stream and optional context information
-   * @param source the source input stream 
-   * @param conf optional configuration object 
-   * @param uri optional uri
-   * @return
-   * @throws IOException
-   */
-  public static ARCFileReader newReader(InputStream source,final Configuration conf,final URI uri)throws IOException { 
-    if (uri != null && conf != null && uri.getScheme() != null && uri.getScheme().equalsIgnoreCase("s3n") && conf.getBoolean(USE_S3_INPUTSTREAM, false)) {
-      System.out.println("!!!!!!USING S3INPUTSTREAM");
-      // swap out sources
-      InputStream originalSource = source;
-      source = new S3InputStream(uri, conf.get("fs.s3n.awsAccessKeyId"), conf.get("fs.s3n.awsSecretAccessKey"), 1048576);
-      originalSource.close();
-    }
-    return new ARCFileReader(source);
-  }
-  
-  
-
   /** 
    * constructor is now private. use the factory method above to construct a reader 
    * @param source
    * @throws IOException
    */
-  private ARCFileReader(final InputStream source)throws IOException {
+  public ARCFileReader(final InputStream source)throws IOException {
     super(new CustomPushbackInputStream(new CountingInputStream(source),
         _blockSize), new Inflater(true), _blockSize);
     readARCHeader();
@@ -853,10 +825,7 @@ public final class ARCFileReader extends InflaterInputStream {
 
     final URI uri =  new URI(path);
     FileSystem fs = FileSystem.get(uri,conf);
-        
-    //use s3inputstream to download content 
-    conf.setBoolean(ARCFileReader.USE_S3_INPUTSTREAM, true);
-    
+            
 //    byte data[] = new byte[4096*10];
 //    int readAmt = 0;
 //    while ((readAmt = stream.get().read(data)) != -1) { 
@@ -869,7 +838,7 @@ public final class ARCFileReader extends InflaterInputStream {
     
     try { 
       System.out.println("Initializing Reader for Path:" + uri );
-      reader = ARCFileReader.newReader(fs.open(new Path(path)),conf,uri);
+      reader = new ARCFileReader(fs.open(new Path(path)));
       
       Text key = new Text();
       BytesWritable value = new BytesWritable();

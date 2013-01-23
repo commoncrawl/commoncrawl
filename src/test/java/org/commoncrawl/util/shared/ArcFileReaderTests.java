@@ -437,7 +437,7 @@ public class ArcFileReaderTests {
         }
       };
       in.reset(os.getData(),os.getLength());
-      ARCFileReader reader = ARCFileReader.newReader(in,null,null);
+      ARCFileReader reader = new ARCFileReader(in);
       int index = 0;
       Text key = new Text();
       BytesWritable value = new BytesWritable();
