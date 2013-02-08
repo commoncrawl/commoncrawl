@@ -56,7 +56,8 @@ public class RccTask extends Task {
 
   private String                   language    = "java";
   private File                     src;
-  private File                     dest        = new File(".");
+  private File                     destDir        = null;
+  private File                     srcDir        = null;
   private final ArrayList<FileSet> filesets    = new ArrayList<FileSet>();
   private boolean                  failOnError = true;
 
@@ -101,7 +102,17 @@ public class RccTask extends Task {
    *          output directory
    */
   public void setDestdir(File dir) {
-    this.dest = dir;
+    this.destDir = dir;
+  }
+
+  /**
+   * Sets directory where output files will be generated
+   * 
+   * @param dir
+   *          output directory
+   */
+  public void setSrcdir(File dir) {
+    this.srcDir = dir;
   }
 
   /**
@@ -115,21 +126,27 @@ public class RccTask extends Task {
   }
 
   /** gen stamp **/
-  File getGenStampFile(File baseDir) {
-    return new File(baseDir, "gen.stamp");
+  File getGenStampFile(File targetFile)throws BuildException {
+    String targetPath = targetFile.getParentFile().getAbsolutePath();
+    String srcDirPath = srcDir.getAbsolutePath();
+    if (!targetPath.startsWith(srcDirPath)) { 
+      throw new BuildException("Target File:" + targetFile + " must be rooted off of srcDir:" + srcDirPath);
+    }
+    String relativePath = targetPath.substring(srcDirPath.length());
+    return new File(destDir.getAbsolutePath() + relativePath,targetFile.getName() + ".gen.stamp");
   }
 
   /**
    * Invoke the Hadoop record compiler on each record definition file
    */
   public void execute() throws BuildException {
-    if (src == null && filesets.size() == 0) {
+    if ((src == null && filesets.size() == 0) || destDir == null || srcDir == null) {
       throw new BuildException(
-          "There must be a file attribute or a fileset child element");
+          "There must be a file attribute or a fileset child element. destDir and srcDir are also mandatory");
     }
 
     if (src != null) {
-      File genStampFile = getGenStampFile(src.getParentFile());
+      File genStampFile = getGenStampFile(src);
 
       // if gen stamp does not exist or protocol file was modified ...
       if (!genStampFile.exists()
@@ -156,7 +173,7 @@ public class RccTask extends Task {
       String[] srcs = ds.getIncludedFiles();
       for (int j = 0; j < srcs.length; j++) {
         File srcLocation = new File(dir, srcs[j]);
-        File genStampFile = getGenStampFile(srcLocation.getParentFile());
+        File genStampFile = getGenStampFile(srcLocation);
         if (!genStampFile.exists()
             || srcLocation.lastModified() > genStampFile.lastModified()) {
 
@@ -180,7 +197,7 @@ public class RccTask extends Task {
     args[0] = "--language";
     args[1] = this.language;
     args[2] = "--destdir";
-    args[3] = this.dest.getPath();
+    args[3] = this.destDir.getPath();
     args[4] = file.getPath();
     int retVal = -1;
     try {

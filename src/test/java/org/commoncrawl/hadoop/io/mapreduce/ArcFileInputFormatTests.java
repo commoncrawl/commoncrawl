@@ -41,8 +41,11 @@ import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.TaskAttemptID;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.input.FileSplit;
+import org.commoncrawl.protocol.shared.ArcFileItem;
 import org.commoncrawl.util.shared.ArcFileReaderTests.TestRecord;
+import org.commoncrawl.util.shared.ArcFileItemUtils;
 import org.commoncrawl.util.shared.ArcFileReaderTests;
+import org.commoncrawl.crawl.common.shared.Constants;
 import org.commoncrawl.io.shared.NIOHttpHeaders;
 import org.commoncrawl.util.shared.ByteArrayUtils;
 import org.commoncrawl.util.shared.Tuples.Pair;
@@ -68,8 +71,15 @@ public class ArcFileInputFormatTests {
       
       long testAttemptTime = System.currentTimeMillis();
       
+      NIOHttpHeaders testHeaders = new NIOHttpHeaders();
+      testHeaders.add("test", "test-value");
+      
       for (TestRecord record : recordSet) { 
-        ArcFileReaderTests.write(os,record.url,"test",1,1,record.data,0,record.data.length,new NIOHttpHeaders(),"text/html",MD5Hash.digest(record.data).toString(),12345,testAttemptTime);
+        long preWritePos = os.getPos();
+        ArcFileReaderTests.write(os,record.url,"test",1,1,record.data,0,record.data.length,testHeaders,"text/html",MD5Hash.digest(record.data).toString(),12345,testAttemptTime);
+        long postWritePos = os.getPos();
+        record.streamPos = (int)preWritePos;
+        record.rawSize = (int) (postWritePos - preWritePos);
       }
       os.flush();
     }
@@ -87,6 +97,7 @@ public class ArcFileInputFormatTests {
     return list;
   }
   
+  static final int NUM_ITERATIONS = 1;
   static final int NUM_TEST_FILES = 10;
 
   static final int getIndexOfSplit(List<Pair<Path,List<TestRecord>>> splits, InputSplit targetSplit) { 
@@ -133,11 +144,53 @@ public class ArcFileInputFormatTests {
     
   }
   
+  static void validateArcFileItemSplit(FileSystem fs,InputSplit split,List<Pair<Path,List<TestRecord>>> splits,RecordReader<Text,ArcFileItem> reader) throws IOException, InterruptedException {
+    
+    int splitDataIndex = getIndexOfSplit(splits,split);
+    
+    Assert.assertTrue(splitDataIndex != -1);
+    
+    List<TestRecord> records = splits.get(splitDataIndex).e1;
+    
+    int itemIndex = 0;
+    // iterate and validate stuff ...
+    while (reader.nextKeyValue()) {
+      
+      Text key = reader.getCurrentKey();
+      ArcFileItem value = reader.getCurrentValue();
+      
+      TestRecord testRecord = records.get(itemIndex++);
+      
+      // get test key bytes as utf-8 bytes ... 
+      byte[] testKeyBytes = testRecord.url.getBytes(Charset.forName("UTF-8"));
+      // compare against raw key bytes to validate key is the same (Text's utf-8 mapping code replaces invalid characters 
+      // with ?, which causes our test case (which does use invalid characters to from the key, to break.
+      Assert.assertTrue(ArcFileReaderTests.compareTo(testKeyBytes,0,testKeyBytes.length,key.getBytes(),0,key.getLength()) == 0);
+      // retured bytes represent the header(encoded in utf-8), terminated by a \r\n\r\n. The content follows this terminator
+      // we search for this specific byte pattern to locate start of content, then compare it against source ... 
+      Assert.assertTrue(ArcFileReaderTests.compareTo(testRecord.data,0,testRecord.data.length,value.getContent().getReadOnlyBytes(),value.getContent().getOffset(),value.getContent().getCount()) == 0);
+      NIOHttpHeaders headers = ArcFileItemUtils.buildHeaderFromArcFileItemHeaders(value.getHeaderItems());
+      // validate metadata 
+      Assert.assertEquals("text/html",headers.findValue(Constants.ARCFileHeader_ARC_MimeType));
+      Assert.assertEquals(value.getArcFilePos(),testRecord.streamPos);
+      Assert.assertEquals(value.getArcFileSize(),testRecord.rawSize);
+      Assert.assertEquals("test-value", headers.findValue("test"));
+      Assert.assertEquals(value.getArcFileName(),((FileSplit)split).getPath().getName());
+      
+    }
+    reader.close();
+    
+    Assert.assertEquals(itemIndex,ArcFileReaderTests.BASIC_TEST_RECORD_COUNT);
+    
+    splits.remove(splitDataIndex);
+    
+  }
+  
   @Test
   public void TestArcInputFormat() throws IOException, InterruptedException {
-    for (int i=0;i<10;++i) { 
+    for (int i=0;i<NUM_ITERATIONS;++i) { 
       Job job = new Job();
-      FileSystem fs = LocalFileSystem.newInstance(job.getConfiguration());
+      FileSystem fs = LocalFileSystem.get(job.getConfiguration());
       Path path = new Path("/tmp/" + File.createTempFile("ARCInputFormat", "test").getName());
       fs.mkdirs(path);
       
@@ -160,4 +213,33 @@ public class ArcFileInputFormatTests {
     }
     
   }
+
+  @Test
+  public void TestArcFileItemInputFormat() throws IOException, InterruptedException {
+    for (int i=0;i<NUM_ITERATIONS;++i) { 
+      Job job = new Job();
+      FileSystem fs = LocalFileSystem.get(job.getConfiguration());
+      Path path = new Path("/tmp/" + File.createTempFile("ARCInputFormat", "test").getName());
+      fs.mkdirs(path);
+      
+      List<Pair<Path,List<TestRecord>>> fileList = buildTestFiles(path, fs, NUM_TEST_FILES);
+      
+      FileInputFormat.setInputPaths(job, path);
+      
+      ARCFileItemInputFormat inputFormat = new ARCFileItemInputFormat();
+      
+      List<InputSplit> splits = inputFormat.getSplits(job);
+      
+      for (InputSplit split : splits) { 
+        RecordReader<Text,ArcFileItem> reader = inputFormat.createRecordReader(split, new TaskAttemptContext(job.getConfiguration(), new TaskAttemptID()));
+        validateArcFileItemSplit(fs, split, fileList, reader);
+      }
+      
+      Assert.assertTrue(fileList.size() == 0);
+      
+      fs.delete(path, true);
+    }
+    
+  }
+  
 }

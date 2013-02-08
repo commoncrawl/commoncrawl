@@ -41,7 +41,6 @@ import org.commoncrawl.io.internal.NIODNSCache.Node;
 import org.commoncrawl.io.internal.NIODNSQueryClient.Status;
 import org.commoncrawl.util.shared.CCStringUtils;
 import org.commoncrawl.util.shared.IPAddressUtils;
-import org.commoncrawl.util.shared.IntrusiveList;
 import org.xbill.DNS.ARecord;
 import org.xbill.DNS.CNAMERecord;
 import org.xbill.DNS.DClass;
@@ -53,7 +52,7 @@ import org.xbill.DNS.Record;
 import org.xbill.DNS.ResolverConfig;
 import org.xbill.DNS.ReverseMap;
 import org.xbill.DNS.Section;
-import org.xbill.DNS.TCPClient;
+import org.xbill.DNS.SimpleResolver;
 import org.xbill.DNS.TextParseException;
 import org.xbill.DNS.Type;
 import org.xbill.DNS.WireParseException;
@@ -69,9 +68,7 @@ import org.xbill.DNS.WireParseException;
  * 
  */
 
-public final class NIODNSLocalResolver extends
-    IntrusiveList.IntrusiveListElement<NIODNSLocalResolver> implements
-    NIODNSResolver {
+public final class NIODNSLocalResolver implements NIODNSResolver {
 
   public static final int MIN_TTL_VALUE = 60 * 20 * 1000;
 
@@ -255,12 +252,6 @@ public final class NIODNSLocalResolver extends
 
   /** context object **/
   private Object                       _context;
-
-  /**
-   * moved here from simple resolver implementation to allow support for
-   * multiple 'resolver' objects (bound to distinct dns servers)
-   **/
-  LinkedList<TCPClient>                _recycledClients               = new LinkedList<TCPClient>();
 
   /** NIODNSResolver Constructor **/
   public NIODNSLocalResolver(EventLoop eventLoop,
@@ -491,8 +482,7 @@ public final class NIODNSLocalResolver extends
       try {
 
         // allocate a simple resolver object ...
-        NIODNSSimpleResolverImpl resolver = new NIODNSSimpleResolverImpl(this,
-            _dnsServerAddress);
+        SimpleResolver resolver = new SimpleResolver(_dnsServerAddress);
 
         // use tcp if requested ...
         if (useTCP)
@@ -609,9 +599,9 @@ public final class NIODNSLocalResolver extends
 
         try {
 
+          SimpleResolver resolver = new SimpleResolver(_dnsServerAddress);
           // allocate a simple resolver object ...
-          NIODNSSimpleResolverImpl resolver = new NIODNSSimpleResolverImpl(
-              this, _dnsServerAddress);
+          //NIODNSSimpleResolverImpl resolver = new NIODNSSimpleResolverImpl(this, _dnsServerAddress);
 
           // use tcp if requested ...
           if (useTCP)

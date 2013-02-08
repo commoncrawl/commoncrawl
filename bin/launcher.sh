@@ -30,11 +30,11 @@ echo "CCAPP_HOME:"$CCAPP_HOME
 echo "CCAPP_CONF_DIR:$CCAPP_CONF_DIR"
 echo "CCAPP_LOG_DIR:$CCAPP_LOG_DIR"
 
-if ! [ -e $CCAPP_HOME/build/commoncrawl-*.jar ]; then
+if ! [ -e $CCAPP_HOME/target/commoncrawl-*.jar ]; then
 	echo "Please build commoncrawl jar"
 else
-	CCAPP_JAR=`basename $CCAPP_HOME/build/commoncrawl*.jar`
-	CCAPP_JAR_PATH=$CCAPP_HOME/build
+	CCAPP_JAR=`basename $CCAPP_HOME/target/commoncrawl*.jar`
+	CCAPP_JAR_PATH=$CCAPP_HOME/target
 	echo "CCAPP_JAR:"$CCAPP_JAR
 	echo "CCAPP_JAR_PATH:"$CCAPP_JAR_PATH
 fi	
@@ -106,7 +106,7 @@ for f in ${CCAPP_HOME}/lib/*.jar; do
   CLASSPATH=${CLASSPATH}:$f;
 done
 # then add nested libraries in commoncrawl jar
-for f in ${CCAPP_HOME}/build/lib/*.jar; do
+for f in ${CCAPP_HOME}/target/classes/lib/*.jar; do
   CLASSPATH=${CLASSPATH}:$f;
 done
 #next add hadoop jar path 

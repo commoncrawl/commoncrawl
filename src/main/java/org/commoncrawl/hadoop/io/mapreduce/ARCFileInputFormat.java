@@ -43,7 +43,7 @@ import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
  */
 public class ARCFileInputFormat extends FileInputFormat<Text, BytesWritable> {
 
-  private static final String ARC_SUFFIX = "arc.gz";
+  static final String ARC_SUFFIX = "arc.gz";
   
   /** 
    * use this flag to use S3InputStream instead of the S3NFileSystem provided InputStream 

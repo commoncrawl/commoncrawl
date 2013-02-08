@@ -21,6 +21,7 @@ package org.commoncrawl.util.shared;
 
 import java.io.BufferedReader;
 import java.io.EOFException;
+import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -138,7 +139,7 @@ public final class ARCFileReader extends InflaterInputStream {
 
     // save the arc file stream positon up front
     long streamPos = getPosition();
-
+    
     ArcFileBuilder builder = new ArcFileBuilder(streamPos,key,value);
 
     // read header line buffer
@@ -278,12 +279,17 @@ public final class ARCFileReader extends InflaterInputStream {
     if (n > 0) {
       in.unread(buf, len - n, n);
     }
+    
+    long crcValue = readUInt(in);
+    long rawByteLen = readUInt(in);
+    
     // Uses left-to-right evaluation order
-    if ((readUInt(in) != _crc.getValue()) ||
+    if ((crcValue != _crc.getValue()) ||
     // rfc1952; ISIZE is the input size modulo 2^32
-        (readUInt(in) != (inf.getBytesWritten() & 0xffffffffL)))
+        (rawByteLen != (inf.getBytesWritten() & 0xffffffffL)))
       throw new IOException("Corrupt GZIP trailer");
   }
+  
 
   /*
    * Reads unsigned integer in Intel byte order.
@@ -342,7 +348,10 @@ public final class ARCFileReader extends InflaterInputStream {
    */
   public final long getPosition() throws IOException {
     CustomPushbackInputStream in = (CustomPushbackInputStream) this.in;
-    return ((CountingInputStream)in.getSource()).getPosition() - in.available();
+    int rawStreamPos = (int) ((CountingInputStream)in.getSource()).getPosition();
+    int bufferedAmt  = in.getAvailableInBuffer();
+    int bytesRead = rawStreamPos - bufferedAmt;
+    return  bytesRead + 1;
   }
 
   /**
@@ -763,6 +772,18 @@ public final class ARCFileReader extends InflaterInputStream {
     
     public InputStream getSource() { 
       return in;
+    }
+    
+    /** 
+     * get the exact number of bytes available in the stream's buffer 
+     * @return 
+     */
+    public int getAvailableInBuffer() { 
+      return buf.length - pos;
+    }
+    
+    public void debug() { 
+      System.out.println(HexDump.dumpHexString(buf, pos, Math.min(buf.length-pos, 100)));
     }
     
   }

@@ -22,7 +22,6 @@ package org.commoncrawl.hadoop.io.mapred;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.List;
 
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
@@ -67,19 +66,27 @@ public class ARCFileInputFormat extends FileInputFormat<Text, BytesWritable> {
    */
   @Override
   protected FileStatus[] listStatus(JobConf job) throws IOException {
-    // delegate to super class 
-    FileStatus candidateList[] = super.listStatus(job);
+    return filterInputCandidates(super.listStatus(job));
+  }
+
+  /** 
+   * filter an array of FileStatus objects by arc file suffix
+   * @param candidateArray
+   * @return the filtered array
+   */
+  public static FileStatus[] filterInputCandidates(FileStatus[] candidateArray){ 
     // allocate new array 
-    ArrayList<FileStatus> listOut = new ArrayList<FileStatus>(candidateList.length);
+    ArrayList<FileStatus> listOut = new ArrayList<FileStatus>(candidateArray.length);
     // walk list removing invalid entries
-    for (int i=0;i<candidateList.length;++i) { 
-      Path pathAtIndex = candidateList[i].getPath();
+    for (int i=0;i<candidateArray.length;++i) { 
+      Path pathAtIndex = candidateArray[i].getPath();
       if (pathAtIndex.getName().endsWith(ARC_SUFFIX)) { 
         // add to final list
-        listOut.add(candidateList[i]);
+        listOut.add(candidateArray[i]);
       }
     }
     return listOut.toArray(new FileStatus[listOut.size()]);
+    
   }
 
   /**

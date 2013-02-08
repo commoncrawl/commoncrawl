@@ -19,8 +19,10 @@ package org.commoncrawl.util.shared;
  * 
  **/
 
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.Charset;
 import java.text.SimpleDateFormat;
@@ -177,6 +179,7 @@ public class ArcFileReaderTests {
         10 + ARC_GZIP_EXTRA_FIELD.length, gzippedMetaData.length - 10);
     bytes = assemblyBuffer;
 
+    //System.out.println("Header Bytes:" + HexDump.dumpHexString(bytes));
     return bytes;
   }
   
@@ -378,6 +381,8 @@ public class ArcFileReaderTests {
     public String url;
     public byte[] data;
     public List<Pair<String,String>> headers;
+    public int streamPos;
+    public int rawSize; 
   }
   
   
@@ -430,13 +435,18 @@ public class ArcFileReaderTests {
       
       final AtomicBoolean streamClosed = new AtomicBoolean();
       // setup ArcFileReader to read the file 
-      DataInputBuffer in = new DataInputBuffer() { 
+      InputStream in = new ByteArrayInputStream(os.getData(),0,os.getLength()) {
+        
+        public synchronized int read(byte b[], int off, int len) {
+          len = 1;
+          return super.read(b, off, len);
+        }
+        
         public void close() throws IOException {
           super.close();
           streamClosed.set(true);
         }
       };
-      in.reset(os.getData(),os.getLength());
       ARCFileReader reader = new ARCFileReader(in);
       int index = 0;
       Text key = new Text();

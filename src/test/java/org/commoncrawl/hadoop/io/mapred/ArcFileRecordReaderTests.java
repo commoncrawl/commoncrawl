@@ -55,7 +55,7 @@ public class ArcFileRecordReaderTests {
   public void TestARCFileRecordReader() throws IOException, InterruptedException { 
     
     JobConf conf = new JobConf();
-    FileSystem fs = LocalFileSystem.newInstance(conf);
+    FileSystem fs = LocalFileSystem.get(conf);
     Path path = new Path("/tmp/" + File.createTempFile("ARCRecordReader", "test"));
     List<TestRecord> records = ArcFileReaderTests.buildTestRecords(ArcFileReaderTests.BASIC_TEST_RECORD_COUNT);
     
