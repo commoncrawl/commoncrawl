@@ -20,6 +20,7 @@ package org.commoncrawl.util.shared;
  **/
 
 import java.io.BufferedReader;
+import java.io.ByteArrayInputStream;
 import java.io.EOFException;
 import java.io.FilterInputStream;
 import java.io.IOException;
@@ -623,8 +624,18 @@ public final class ARCFileReader extends InflaterInputStream {
         rawHeaderSize += buffer.remaining();
       }
       
-      BufferedReader reader = new BufferedReader(readerFromScanBufferList(
-          _buffers, ArcFileBuilder.UTF8_Charset));
+      byte[] headerBytes = new byte[rawHeaderSize];
+      int offset=0;
+      for (ByteBuffer buffer : _buffers) { 
+        int len = buffer.remaining();
+        buffer.get(headerBytes, offset, len);
+        offset+= len;
+      }
+      
+      BufferedReader reader = new BufferedReader(new InputStreamReader(new ByteArrayInputStream(headerBytes),ArcFileBuilder.UTF8_Charset));
+      
+      //BufferedReader reader = new BufferedReader(readerFromScanBufferList(_buffers, ArcFileBuilder.UTF8_Charset));
+      
 
       String line = null;
 
@@ -640,9 +651,10 @@ public final class ARCFileReader extends InflaterInputStream {
       }
       
       // ok now calculate payload size based on header size 
-      _payloadLength = _recordLen - rawHeaderSize;
-      if (_payloadLength < 0) { 
-        throw new IOException("Invalid Payload Size Detected. RecordLen:" + _recordLen + " HeaderLen:" + rawHeaderSize + " Headers:\n" + _headers.toString());
+      _payloadLength = Math.max(0, _recordLen - rawHeaderSize);
+      if (_payloadLength == 0) { 
+        LOG.warn("Invalid Payload Size Detected Key:"+ _keyOut.toString() +" RecordLen:" + _recordLen + " HeaderLen:" + rawHeaderSize + " Headers:\n" + _headers.toString());
+        LOG.warn("Header Dump:"+ HexDump.dumpHexString(headerBytes));
       }
       // set into headers ... 
       _headers.set(Constants.ARCFileHeader_ARC_PayloadLen, Integer.toString(_payloadLength));
@@ -749,10 +761,20 @@ public final class ARCFileReader extends InflaterInputStream {
         if (buffer != null && buffer.remaining() !=0) { 
             // amount to copy 
             int copyAmount = Math.min(_payloadLength - _dataLength,buffer.remaining());
-            // copy the buffer data in one go ...
-            buffer.get(_valueOut.getBytes(), _headerLength + _dataLength, copyAmount);
-            // increment data length ... 
-            _dataLength += copyAmount;
+            if (copyAmount == 0) { 
+              if (buffer.remaining() != 0) { 
+                byte debug[] = new byte[buffer.remaining()];
+                buffer.get(debug);
+                LOG.warn("Trailing Data when Content Already Read for Key:" +_keyOut.toString() +" Size:" + buffer.remaining() + " PayloadLen:" + _payloadLength + " Content:" + HexDump.dumpHexString(debug));
+                
+              }
+            }
+            else { 
+              // copy the buffer data in one go ...
+              buffer.get(_valueOut.getBytes(), _headerLength + _dataLength, copyAmount);
+              // increment data length ... 
+              _dataLength += copyAmount;
+            }
         }
       }
     }
@@ -879,12 +901,15 @@ public final class ARCFileReader extends InflaterInputStream {
       System.out.println("Exiting Loop");
     }
     catch (Exception e) {
+      System.out.println(CCStringUtils.stringifyException(e));
       LOG.error(CCStringUtils.stringifyException(e));
       //throw new IOException(e);
     }
-    finally { 
-      System.out.println("***Closing Reader");
-      reader.close();
+    finally {
+      if (reader != null) { 
+        System.out.println("***Closing Reader");
+        reader.close();
+      }
     }
   }
 
