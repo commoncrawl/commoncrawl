@@ -761,13 +761,15 @@ public final class ARCFileReader extends InflaterInputStream {
         if (buffer != null && buffer.remaining() !=0) { 
             // amount to copy 
             int copyAmount = Math.min(_payloadLength - _dataLength,buffer.remaining());
-            if (copyAmount == 0) { 
+            if (copyAmount <= 0) {
+              /*
               if (buffer.remaining() != 0) { 
                 byte debug[] = new byte[buffer.remaining()];
                 buffer.get(debug);
                 LOG.warn("Trailing Data when Content Already Read for Key:" +_keyOut.toString() +" Size:" + buffer.remaining() + " PayloadLen:" + _payloadLength + " Content:" + HexDump.dumpHexString(debug));
                 
               }
+              */
             }
             else { 
               // copy the buffer data in one go ...
@@ -781,7 +783,7 @@ public final class ARCFileReader extends InflaterInputStream {
   }
 
   /** 
-   * sigh... stupid java classes and their overdone encapsulation :-(
+   * 
    *  
    * @author rana
    *
