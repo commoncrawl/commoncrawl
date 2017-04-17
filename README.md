@@ -1,6 +1,6 @@
-#CommonCrawl Support Library
+# CommonCrawl Support Library
 
-##Overview
+## Overview
 
 This library provides support code for the consumption of the CommonCrawl Crawl Corpus 
 RAW crawl data (ARC Files) stored on S3. More information about how to access the corpus 
@@ -23,12 +23,12 @@ downloaded by the crawler. The HTTP headers are UTF-8 encoded, and the headers a
 are delimited by a consecutive set of CRLF tokens. The content itself, when it is of a text
 mime type, is encoded using the source text encoding. 
 
-##Build Notes: 
+## Build Notes: 
 
 1. You need to define JAVA_HOME, and make sure you have Ant & Maven installed.
 2. Set hadoop.path (in build.properties) to point to your Hadoop distribution.
 
-#Sample Usage:
+# Sample Usage:
 
 Once the commoncrawl.jar has been built, you can validate that the ARCFileReader works for you by 
 executing the sample command line from root for the commoncrawl source directory:  
