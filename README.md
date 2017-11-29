@@ -1,8 +1,8 @@
-# CommonCrawl Support Library
+# Common Crawl Support Library
 
 ## Overview
 
-This library provides support code for the consumption of the CommonCrawl Crawl Corpus 
+This library provides support code for the consumption of the Common Crawl Corpus
 RAW crawl data (ARC Files) stored on S3. More information about how to access the corpus 
 can be found at https://commoncrawl.atlassian.net/wiki/display/CRWL/About+the+Data+Set .
 
