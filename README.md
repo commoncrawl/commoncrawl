@@ -1,32 +1,36 @@
-#CommonCrawl Support Library
+# Common Crawl Support Library
 
-##Overview
+## Overview
 
-The commoncrawl source code repository is used as a distribution vehicle for our custom
-Hadoop InputFormat (ARCInputFormat located in org.commoncrawl.hadoop.io). Please refer 
-to the CommonCrawl website at http://www.commoncrawl.org/ for more details on how to 
-access our crawl corpus.
+This library provides support code for the consumption of the Common Crawl Corpus
+RAW crawl data (ARC Files) stored on S3. More information about how to access the corpus 
+can be found at https://commoncrawl.atlassian.net/wiki/display/CRWL/About+the+Data+Set .
 
-The sample class BasicArcFileReaderSample.java (located in org.commoncrawl.samples) for an 
-example of how to configure the InputFormat. A more detailed example of how to use it in 
-the context of a Hadoop Job will be forthcoming.
+You can take two primary routes to consuming the ARC File content: 
 
-##Build Notes: 
+(1) You can run a Hadoop cluster on EC2 or use EMR to run a Hadoop job. In this case, 
+you can use the ARCFileInputFormat to drive data to your mappers/reducers. There are two 
+versions of the InputFormat: One written to conform to the deprecated mapred package, 
+located at org.commoncrawl.hadoop.io.mapred and one written for the mapreduce package,
+correspondingly located at org.commoncrawl.hadoop.io.mapreduce. 
+
+(2) You can decode data directly by feeding an InputStream to the ARCFileReader class 
+located in the org.commoncrawl.util.shared package. 
+
+Both routes (InputFormat or ARCFileReader direct route) produce a tuple consisting of a UTF-8 
+encoded URL (Text), and the raw content (BytesWritable), including HTTP headers, that were 
+downloaded by the crawler. The HTTP headers are UTF-8 encoded, and the headers and content
+are delimited by a consecutive set of CRLF tokens. The content itself, when it is of a text
+mime type, is encoded using the source text encoding. 
+
+## Build Notes: 
 
 1. You need to define JAVA_HOME, and make sure you have Ant & Maven installed.
-2. Set hadoop.path (in build.properties) to point to your Hadoop folder.
-3. Make sure you have the thrift compiler (version 0.7.0) installed on your system.
-4. If you want to use the Google URL Canoncilization library in Hadoop job,
-   copy the shared libraries under lib/native/{Platform} to /usr/local/lib or equivalent.
+2. Set hadoop.path (in build.properties) to point to your Hadoop distribution.
 
-#Sample Usage:
+# Sample Usage:
 
-Once commoncrawl.jar has been built, you can execute a job/sample via the bin/launcher.sh script.
-The sample class BasicArcFileReaderSample.java (located in org.commoncrawl.samples) demonstrates  
-how you can go about configuring our InputFormat. To run the BasicArcFileReaderSample against
-an ARC file in the corpus (2010/01/07/18/1262876244253_18.arc.gz for example), you would run 
-the following command line:
+Once the commoncrawl.jar has been built, you can validate that the ARCFileReader works for you by 
+executing the sample command line from root for the commoncrawl source directory:  
 
-  bin/launcher.sh org.commoncrawl.samples.BasicArcFileReaderSample {AWS ACCESS KEY} {AWS SECRET KEY} commoncrawl-crawl-002 2010/01/07/18/1262876244253_18.arc.gz
-
-
+	./bin/launcher.sh org.commoncrawl.util.shared.ARCFileReader --awsAccessKey <ACCESS KEY> --awsSecret <SECRET> --file s3n://aws-publicdatasets/common-crawl/parse-output/segment/1341690164240/1341819847375_4319.arc.gz
