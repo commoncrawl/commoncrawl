@@ -307,7 +307,7 @@
 
 	  <!-- Pom file information -->
 	  <artifact:pom id="pom" 
-	    groupId="${ commoncrawl.groupid}" 
+	    groupId="${commoncrawl.groupid}"
 	    artifactId="${commoncrawl.artifactid}"
 	    version="${version}" 
 	    url="http://www.commoncrawl.org"
